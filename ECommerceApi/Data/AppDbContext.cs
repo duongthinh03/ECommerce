@@ -5,19 +5,19 @@ namespace ECommerceApi.Data
 {
     public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
-        // --- Auth (Lát 1, nhóm 1) ---
+        // --- Auth (nhóm 1) ---
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<User> Users => Set<User>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
-        // --- Catalog (Lát 1, nhóm 2) ---
+        // --- Catalog (nhóm 2) ---
         public DbSet<Brand> Brands => Set<Brand>();
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Product> Products => Set<Product>();
         public DbSet<ProductImage> ProductImages => Set<ProductImage>();
         public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
 
-        // --- Attribute đa ngành (Lát 1, nhóm 3) ---
+        // --- Attribute đa ngành (nhóm 3) ---
         public DbSet<ProductAttribute> Attributes => Set<ProductAttribute>();
         public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
         public DbSet<CategoryAttribute> CategoryAttributes => Set<CategoryAttribute>();

@@ -19,8 +19,9 @@ Backend API cho web thương mại điện tử đa ngành hàng. ASP.NET Core (
 
 ### 1. Chạy SQL Server bằng Docker
 ```powershell
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Ecom@2026Dev" -p 1433:1433 --name ecom-sql -v ecom-sqldata:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2022-latest
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Ecom@2026Dev" -p 14330:1433 --name ecom-sql -v ecom-sqldata:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2022-latest
 ```
+> Map cổng host **14330** → 1433 trong container để tránh đụng SQL Server native (nếu máy có sẵn instance chiếm 1433). Máy không có SQL native thì dùng `-p 1433:1433` cũng được — nhớ chỉnh cổng trong connection string cho khớp.
 > Mật khẩu SA phải đủ mạnh (≥8 ký tự, đủ hoa/thường/số/đặc biệt) nếu không container sẽ tắt.
 > Container đã có sẵn lần sau chỉ cần: `docker start ecom-sql`.
 
@@ -28,7 +29,7 @@ docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Ecom@2026Dev" -p 1433:1433 -
 Repo **không chứa** connection string (tránh commit secret). Tự set vào user-secrets — **chỉ cần thay `<YOUR_PASSWORD>`** cho khớp mật khẩu ở bước 1:
 ```powershell
 cd ECommerceApi
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=ECommerceDb;User Id=sa;Password=<YOUR_PASSWORD>;TrustServerCertificate=True"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,14330;Database=ECommerceDb;User Id=sa;Password=<YOUR_PASSWORD>;TrustServerCertificate=True"
 ```
 Kiểm tra: `dotnet user-secrets list`
 
