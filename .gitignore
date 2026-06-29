@@ -376,5 +376,6 @@ bk-db/
 **/be.txt
 **/bo.txt
 
-#
+# Local secrets / env — KHÔNG đẩy lên repo
 .env
+**/appsettings.Development.json
