@@ -2,8 +2,6 @@
 
 Backend API cho web thương mại điện tử đa ngành hàng. ASP.NET Core (.NET 10) + EF Core + SQL Server.
 
-> Định hướng & schema: xem `PLAN_ECOMMERCE_MULTI_NGANH.md`. Nhật ký dựng nền: `BRAINSTORM_BUOC_DAU.md`.
-
 ## Stack
 - **.NET 10** (ASP.NET Core Web API)
 - **EF Core 10** + SQL Server (Docker)

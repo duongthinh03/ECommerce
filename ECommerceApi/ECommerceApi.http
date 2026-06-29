@@ -1,6 +1,150 @@
-@ECommerceApi_HostAddress = http://localhost:5232
+@host = http://localhost:5232
+@adminEmail = a@test.com
+@adminPassword = Test@123
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwiZW1haWwiOiJhQHRlc3QuY29tIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJuYW1lIjoiTmd1eWVuIFZhbiBBIiwianRpIjoiN2Y4NWU5MzctY2ZmYy00YTc4LTg0OGMtYWE0NjI0YzViM2VkIiwiZXhwIjoxNzgyNzMwNzYzLCJpc3MiOiJFQ29tbWVyY2VBcGkiLCJhdWQiOiJFQ29tbWVyY2VBcGlDbGllbnQifQ.Cz9w2hH-eRSPAUoKh0wPK8pVQF8eCk1_j-RPqxLYb94
 
-GET {{ECommerceApi_HostAddress}}/weatherforecast/
-Accept: application/json
+###############################################
+# AUTH
+###############################################
 
-###
+### Đăng ký (tạo user Customer)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "a@test.com",
+  "password": "Test@123",
+  "fullName": "Nguyen Van A",
+  "phone": "0900000000"
+}
+
+### Đăng nhập admin -> lấy token (đặt tên 'login' để tái dùng token bên dưới)
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Lấy accessToken từ response của request 'login' ở trên
+@token = {{login.response.body.$.data.accessToken}}
+
+### Refresh token
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.$.data.refreshToken}}"
+}
+
+###############################################
+# CATEGORY (CRUD)
+###############################################
+
+### Danh sách category (công khai - không cần token)
+GET {{host}}/api/categories
+
+### Tạo category (cần Admin)
+POST {{host}}/api/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Điện thoại",
+  "slug": "dien-thoai",
+  "description": "Ngành hàng điện thoại",
+  "sortOrder": 1,
+  "isActive": true
+}
+
+### Chi tiết category id=1 (công khai)
+GET {{host}}/api/categories/1
+
+### Cập nhật category id=1 (cần Admin)
+PUT {{host}}/api/categories/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Điện thoại & Phụ kiện",
+  "slug": "dien-thoai",
+  "description": "Đã cập nhật mô tả",
+  "sortOrder": 2,
+  "isActive": true
+}
+
+### Xóa category id=1 (cần Admin - soft delete)
+DELETE {{host}}/api/categories/1
+Authorization: Bearer {{token}}
+
+###############################################
+# TEST PHÂN QUYỀN
+###############################################
+
+### Tạo category KHÔNG token -> mong đợi 401 Unauthorized
+POST {{host}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "Khong token",
+  "slug": "khong-token",
+  "sortOrder": 0,
+  "isActive": true
+}
+
+###############################################
+# PRODUCT (CRUD)
+###############################################
+
+### Danh sách product (công khai)
+GET {{host}}/api/products
+
+### Tạo product (cần Admin) - đổi categoryId cho khớp category đã có
+POST {{host}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "iPhone 15",
+  "slug": "iphone-15",
+  "description": "Điện thoại Apple",
+  "categoryId": 1,
+  "displayPrice": 20000000,
+  "isActive": true
+}
+
+### Chi tiết product id=1 (công khai)
+GET {{host}}/api/products/1
+
+### Cập nhật product id=1 (cần Admin)
+PUT {{host}}/api/products/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "iPhone 15 Pro",
+  "slug": "iphone-15",
+  "description": "Bản Pro",
+  "categoryId": 1,
+  "displayPrice": 28000000,
+  "isActive": true
+}
+
+### Xóa product id=1 (cần Admin - soft delete)
+DELETE {{host}}/api/products/1
+Authorization: Bearer {{token}}
+
+### Test FK sai: categoryId không tồn tại -> mong đợi 400
+POST {{host}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "San pham loi",
+  "slug": "sp-loi",
+  "categoryId": 999,
+  "displayPrice": 1000,
+  "isActive": true
+}

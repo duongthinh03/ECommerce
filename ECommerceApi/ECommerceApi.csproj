@@ -31,8 +31,6 @@
     <Folder Include="GraphQL\Queries\" />
     <Folder Include="GraphQL\Types\" />
     <Folder Include="Models\" />
-    <Folder Include="DTOs\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>
