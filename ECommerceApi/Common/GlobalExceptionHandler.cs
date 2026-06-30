@@ -35,7 +35,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 break;
             case UnauthorizedAccessException:
                 status = StatusCodes.Status401Unauthorized;
-                message = "Không có quyền truy cập";
+                message = exception.Message;   // dùng message thật (vd "Email hoặc mật khẩu không đúng")
                 break;
             default:
                 status = StatusCodes.Status500InternalServerError;

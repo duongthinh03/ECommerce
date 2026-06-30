@@ -4,7 +4,7 @@ namespace ECommerceApi.Services;
 
 public interface IAuthService
 {
-    Task<AuthResponse> RegisterAsync(RegisterRequest request);
+    Task RegisterAsync(RegisterRequest request);   // KHÔNG cấp token — phải verify email mới login
     Task<AuthResponse> LoginAsync(LoginRequest request);
     Task<AuthResponse> RefreshAsync(string refreshToken);
     Task VerifyOtpAsync(string email, string otp);

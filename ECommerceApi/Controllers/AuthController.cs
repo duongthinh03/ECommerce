@@ -10,8 +10,8 @@ namespace ECommerceApi.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            var response = await authService.RegisterAsync(request);
-            return OkResponse(response, "Đăng ký thành công");
+            await authService.RegisterAsync(request);
+            return OkResponse<object?>(null, "Đăng ký thành công. Vui lòng nhập mã OTP gửi tới email để kích hoạt tài khoản.");
         }
 
         [HttpPost("login")]

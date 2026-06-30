@@ -8,12 +8,12 @@ using BC = BCrypt.Net.BCrypt;
 
 namespace ECommerceApi.Services;
 
-public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<JwtSettings> jwtOptions, IEmailSender emailSender) : IAuthService
+public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<JwtSettings> jwtOptions, IEmailSender emailSender, ILogger<AuthService> logger) : IAuthService
 {
     private const int CustomerRoleId = 4;   // seed: 1 Admin, 2 Manager, 3 Staff, 4 Customer
     private readonly JwtSettings _jwt = jwtOptions.Value;
 
-    public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
+    public async Task RegisterAsync(RegisterRequest request)
     {
         var users = uow.Repository<User>();
 
@@ -34,9 +34,15 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
         await users.AddAsync(user);
         await uow.CommitAsync();
 
-        await SendOtpAsync(user.Email, "register");   // gửi OTP xác thực email
-
-        return await IssueTokensAsync(user, roleName: "Customer");
+        // Gửi OTP xác thực — KHÔNG cấp token (phải verify email mới đăng nhập được)
+        try
+        {
+            await SendOtpAsync(user.Email, "register");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Gửi OTP đăng ký thất bại cho {Email}", user.Email);
+        }
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -50,6 +56,9 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
 
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Tài khoản đã bị khóa");
+
+        if (!user.EmailConfirmed)
+            throw new UnauthorizedAccessException("Email chưa xác thực. Vui lòng nhập mã OTP gửi tới email.");
 
         user.LastLoginAt = DateTime.UtcNow;
         uow.Repository<User>().Update(user);
@@ -120,8 +129,12 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
             Used = false
         });
         await uow.CommitAsync();
-        await emailSender.SendAsync(email, "Mã xác thực ECommerceApi",
-            $"Mã OTP của bạn là: {code} (hết hạn sau 10 phút).");
+        await emailSender.SendAsync(email, "Mã xác thực tài khoản ShopViet",
+            $"Chào bạn,\n\n" +
+            $"Mã OTP xác thực tài khoản ShopViet của bạn là: {code}\n" +
+            $"Mã có hiệu lực trong 10 phút.\n\n" +
+            $"Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email.\n\n" +
+            $"— ShopViet");
     }
 
     public async Task ResendOtpAsync(string email)

@@ -75,7 +75,12 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
-builder.Services.AddScoped<IEmailSender, LogEmailSender>();
+// Email: có Smtp:Password (user-secrets) → gửi thật; chưa có → log ra console (dev)
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection(SmtpSettings.SectionName));
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Password"]))
+    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+else
+    builder.Services.AddScoped<IEmailSender, LogEmailSender>();
 
 var app = builder.Build();
 
