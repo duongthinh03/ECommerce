@@ -23,6 +23,17 @@ namespace ECommerceApi.Data
         public DbSet<CategoryAttribute> CategoryAttributes => Set<CategoryAttribute>();
         public DbSet<VariantAttributeValue> VariantAttributeValues => Set<VariantAttributeValue>();
 
+        // --- Cart ---
+        public DbSet<Cart> Carts => Set<Cart>();
+        public DbSet<CartItem> CartItems => Set<CartItem>();
+
+        // --- Order ---
+        public DbSet<Order> Orders => Set<Order>();
+        public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+        public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+
+
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Tự nạp mọi IEntityTypeConfiguration<T> trong assembly này

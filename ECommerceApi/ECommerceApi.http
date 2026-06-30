@@ -1,8 +1,6 @@
 @host = http://localhost:5232
 @adminEmail = a@test.com
 @adminPassword = Test@123
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwiZW1haWwiOiJhQHRlc3QuY29tIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJuYW1lIjoiTmd1eWVuIFZhbiBBIiwianRpIjoiN2Y4NWU5MzctY2ZmYy00YTc4LTg0OGMtYWE0NjI0YzViM2VkIiwiZXhwIjoxNzgyNzMwNzYzLCJpc3MiOiJFQ29tbWVyY2VBcGkiLCJhdWQiOiJFQ29tbWVyY2VBcGlDbGllbnQifQ.Cz9w2hH-eRSPAUoKh0wPK8pVQF8eCk1_j-RPqxLYb94
-
 ###############################################
 # AUTH
 ###############################################
@@ -148,3 +146,129 @@ Authorization: Bearer {{token}}
   "displayPrice": 1000,
   "isActive": true
 }
+
+###############################################
+# VARIANT (CRUD) - lồng dưới product
+###############################################
+
+### Danh sách variant của product 1 (công khai)
+GET {{host}}/api/products/1/variants
+
+### Tạo variant cho product 1 (cần Admin)
+POST {{host}}/api/products/1/variants
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "IP15-128-BLACK",
+  "price": 20000000,
+  "compareAtPrice": 22000000,
+  "stock": 50,
+  "isActive": true
+}
+
+### Chi tiết variant id=1 của product 1
+GET {{host}}/api/products/1/variants/1
+
+### Cập nhật variant id=1 (cần Admin)
+PUT {{host}}/api/products/1/variants/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "IP15-128-BLACK",
+  "price": 19500000,
+  "stock": 45,
+  "isActive": true
+}
+
+### Xóa variant id=1 (cần Admin)
+DELETE {{host}}/api/products/1/variants/1
+Authorization: Bearer {{token}}
+
+### Test product cha không tồn tại -> mong đợi 404
+POST {{host}}/api/products/1/variants
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "SKU-LOI",
+  "price": 1000,
+  "stock": 1,
+  "isActive": true
+}
+
+
+### Guest: thêm vào giỏ (dùng header X-Session-Id tùy ý)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+X-Session-Id: guest-abc-123
+
+{ "variantId": 1, "quantity": 2 }
+
+### Xem giỏ guest
+GET {{host}}/api/cart
+X-Session-Id: guest-abc-123
+
+### User: thêm vào giỏ (dùng token, KHÔNG cần header)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "variantId": 1, "quantity": 1 }
+
+### 1) Guest bỏ hàng vào giỏ (chưa login)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+X-Session-Id: guest-abc-123
+
+{ "variantId": 1, "quantity": 2 }
+
+### 2) Login (lấy token user) — bấm request login ở phần AUTH
+
+### 3) Merge giỏ guest vào giỏ user
+POST {{host}}/api/cart/merge
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "sessionId": "guest-abc-123" }
+
+###############################################
+# ORDER (Checkout COD)
+###############################################
+### 1) Login lấy token (bấm request 'login' ở phần AUTH trước)
+
+### 2) Thêm hàng vào giỏ (user)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "variantId": 1, "quantity": 2 }
+
+### 3) Đặt hàng (checkout) -> tạo đơn + trừ kho + xóa giỏ
+POST {{host}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "shipRecipient": "Nguyen Van A",
+  "shipPhone": "0900000000",
+  "shipProvince": "Hà Nội",
+  "shipDistrict": "Cầu Giấy",
+  "shipWard": "Dịch Vọng",
+  "shipAddressLine": "Số 1 Phố ABC",
+  "note": "Giao giờ hành chính",
+  "paymentMethod": "COD"
+}
+
+### 4) Xem đơn của tôi
+GET {{host}}/api/orders
+Authorization: Bearer {{token}}
+
+### 5) Chi tiết đơn id=1
+GET {{host}}/api/orders/1
+Authorization: Bearer {{token}}
+
+### 6) Giỏ phải RỖNG sau khi đặt
+GET {{host}}/api/cart
+Authorization: Bearer {{token}}

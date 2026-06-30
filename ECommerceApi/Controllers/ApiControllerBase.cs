@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ECommerceApi.Common;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,4 +19,13 @@ public abstract class ApiControllerBase : ControllerBase
 
     protected IActionResult BadRequestResponse(string message, object? errors = null) =>
         BadRequest(ApiResponse<object>.Fail(message, errors));
+    
+    protected int? CurrentUserId
+    {
+        get
+        {
+            var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+            return int.TryParse(id, out var uid) ? uid : null;
+        }
+    }
 }
