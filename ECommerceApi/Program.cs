@@ -13,6 +13,17 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ----- CORS -----
+const string CorsPolicy = "AllowFrontend";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicy, policy =>
+        policy.WithOrigins("http://localhost:3000")   // origin của Next.js (dev)
+              .AllowAnyHeader()                        // cho Authorization, X-Session-Id...
+              .AllowAnyMethod()                        // GET/POST/PUT/DELETE
+              .AllowCredentials());                    // cho cookie (plan dùng httpOnly cookie sau)
+});
+
 // ----- Services -----
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -72,6 +83,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors(CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
