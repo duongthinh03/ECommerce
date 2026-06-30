@@ -151,6 +151,47 @@ namespace ECommerceApi.Services
             return ToDto(order);
         }
 
+        // --- Admin ---
+        public async Task<IEnumerable<OrderDto>> GetAllAsync()
+        {
+            var orders = await uow.Repository<Order>().Query()
+                .Include(o => o.Items)
+                .OrderByDescending(o => o.Id)
+                .ToListAsync();
+            return orders.Select(ToDto);
+        }
+
+        public async Task<OrderDto> GetAdminByIdAsync(int orderId)
+        {
+            var order = await uow.Repository<Order>().Query()
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.Id == orderId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy đơn id={orderId}");
+            return ToDto(order);
+        }
+
+        public async Task<OrderDto> UpdateStatusAsync(int orderId, OrderStatus status, string? note, string changedBy)
+        {
+            var repo = uow.Repository<Order>();
+            var order = await repo.Query()
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.Id == orderId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy đơn id={orderId}");
+
+            order.Status = status;
+            repo.Update(order);
+
+            await uow.Repository<OrderStatusHistory>().AddAsync(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = status,
+                Note = note,
+                ChangedBy = changedBy
+            });
+            await uow.CommitAsync();
+            return ToDto(order);
+        }
+
         private static string GenerateOrderCode() =>
             $"ORD{DateTime.UtcNow:yyyyMMddHHmmss}{Random.Shared.Next(100, 999)}";
 
