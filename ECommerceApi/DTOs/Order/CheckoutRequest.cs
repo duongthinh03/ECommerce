@@ -10,5 +10,6 @@
         public string ShipAddressLine { get; set; } = null!;
         public string? Note { get; set; }
         public string PaymentMethod { get; set; } = "COD";
+        public string? CouponCode { get; set; }   // mã giảm giá (tùy chọn)
     }
 }

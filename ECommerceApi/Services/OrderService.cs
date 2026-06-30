@@ -6,7 +6,7 @@ using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace ECommerceApi.Services
 {
-    public class OrderService(IUnitOfWork uow) : IOrderService
+    public class OrderService(IUnitOfWork uow, ICouponService couponService) : IOrderService
     {
         private const decimal FlatShippingFee = 30000m;   // phí ship phẳng (MVP)
 
@@ -79,7 +79,15 @@ namespace ECommerceApi.Services
                 }
 
                 order.TotalAmount = subtotal;
-                order.FinalAmount = subtotal + order.ShippingFee - order.DiscountAmount;
+
+                // áp dụng coupon (nếu có)
+                Coupon? coupon = null;
+                decimal discount = 0;
+                if (!string.IsNullOrWhiteSpace(request.CouponCode))
+                    (coupon, discount) = await couponService.ValidateAsync(request.CouponCode, userId, subtotal);
+
+                order.DiscountAmount = discount;
+                order.FinalAmount = subtotal + order.ShippingFee - discount;
 
                 order.StatusHistories.Add(new OrderStatusHistory
                 {
@@ -95,7 +103,24 @@ namespace ECommerceApi.Services
                 foreach (var ci in cart.Items.ToList())
                     cartItemRepo.Delete(ci);
 
-                // 3) ══ COMMIT (lưu hết + commit transaction) ══
+                // lưu Order trước để lấy Id (transaction vẫn mở)
+                await uow.SaveChangesAsync();
+
+                // ghi usage coupon + tăng UsedCount
+                if (coupon is not null)
+                {
+                    await uow.Repository<CouponUsage>().AddAsync(new CouponUsage
+                    {
+                        CouponId = coupon.Id,
+                        UserId = userId,
+                        OrderId = order.Id,
+                        DiscountAmount = discount
+                    });
+                    coupon.UsedCount++;
+                    uow.Repository<Coupon>().Update(coupon);
+                }
+
+                // ══ COMMIT (lưu usage + commit transaction) ══
                 await uow.CommitAsync();
 
                 return await GetByIdAsync(userId, order.Id);

@@ -33,6 +33,10 @@ namespace ECommerceApi.Data
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
         public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
 
+        // --- Coupon (Phase 2) ---
+        public DbSet<Coupon> Coupons => Set<Coupon>();
+        public DbSet<CouponUsage> CouponUsages => Set<CouponUsage>();
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

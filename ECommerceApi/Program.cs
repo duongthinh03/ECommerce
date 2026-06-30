@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using ECommerceApi.Common;
 using ECommerceApi.Data;
 using ECommerceApi.Repositories.Base;
@@ -25,7 +26,8 @@ builder.Services.AddCors(options =>
 });
 
 // ----- Services -----
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -72,6 +74,7 @@ builder.Services.AddScoped<IVariantService, VariantService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
+builder.Services.AddScoped<ICouponService, CouponService>();
 
 var app = builder.Build();
 

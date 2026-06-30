@@ -7,6 +7,9 @@ namespace ECommerceApi.UnitOfWork
         // Lấy generic repository cho bất kỳ entity nào (cache theo type)
         IRepository<T> Repository<T>() where T : class;
 
+        // Lưu thay đổi (chưa commit transaction)
+        Task<int> SaveChangesAsync();
+
         // Transaction
         Task BeginAsync();
         Task<int> CommitAsync();

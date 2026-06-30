@@ -20,6 +20,9 @@ namespace ECommerceApi.UnitOfWork
             return repository;
         }
 
+        // Lưu thay đổi nhưng KHÔNG commit transaction (để lấy Id giữa chừng)
+        public Task<int> SaveChangesAsync() => db.SaveChangesAsync();
+
         // Transaction methods
         public async Task BeginAsync() =>
             _transaction = await db.Database.BeginTransactionAsync();
