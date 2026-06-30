@@ -26,4 +26,5 @@ public class User : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
+    public ICollection<Address> Addresses { get; set; } = [];
 }

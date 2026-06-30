@@ -9,6 +9,7 @@ namespace ECommerceApi.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<User> Users => Set<User>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<Address> Addresses => Set<Address>();
 
         // --- Catalog (nhóm 2) ---
         public DbSet<Brand> Brands => Set<Brand>();
