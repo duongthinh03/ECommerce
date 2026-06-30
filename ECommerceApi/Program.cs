@@ -75,6 +75,7 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
+builder.Services.AddScoped<IEmailSender, LogEmailSender>();
 
 var app = builder.Build();
 

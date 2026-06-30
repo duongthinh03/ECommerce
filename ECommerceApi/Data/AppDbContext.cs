@@ -37,6 +37,9 @@ namespace ECommerceApi.Data
         public DbSet<Coupon> Coupons => Set<Coupon>();
         public DbSet<CouponUsage> CouponUsages => Set<CouponUsage>();
 
+        // --- Email OTP (Phase 2) ---
+        public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

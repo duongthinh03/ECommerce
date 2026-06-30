@@ -27,5 +27,19 @@ namespace ECommerceApi.Controllers
             var response = await authService.RefreshAsync(request.RefreshToken);
             return OkResponse(response);
         }
+
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
+        {
+            await authService.VerifyOtpAsync(request.Email, request.Otp);
+            return OkResponse<object?>(null, "Xác thực email thành công");
+        }
+
+        [HttpPost("resend-otp")]
+        public async Task<IActionResult> ResendOtp([FromBody] ResendOtpRequest request)
+        {
+            await authService.ResendOtpAsync(request.Email);
+            return OkResponse<object?>(null, "Đã gửi lại mã OTP");
+        }
     }
 }

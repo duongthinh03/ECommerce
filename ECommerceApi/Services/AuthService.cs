@@ -8,7 +8,7 @@ using BC = BCrypt.Net.BCrypt;
 
 namespace ECommerceApi.Services;
 
-public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<JwtSettings> jwtOptions) : IAuthService
+public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<JwtSettings> jwtOptions, IEmailSender emailSender) : IAuthService
 {
     private const int CustomerRoleId = 4;   // seed: 1 Admin, 2 Manager, 3 Staff, 4 Customer
     private readonly JwtSettings _jwt = jwtOptions.Value;
@@ -33,6 +33,8 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
 
         await users.AddAsync(user);
         await uow.CommitAsync();
+
+        await SendOtpAsync(user.Email, "register");   // gửi OTP xác thực email
 
         return await IssueTokensAsync(user, roleName: "Customer");
     }
@@ -103,5 +105,63 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
                 Role = roleName ?? "Customer"
             }
         };
+    }
+
+    // sinh + lưu + "gửi" OTP (dev: log ra console)
+    private async Task SendOtpAsync(string email, string purpose)
+    {
+        var code = Random.Shared.Next(100000, 999999).ToString();
+        await uow.Repository<EmailOtp>().AddAsync(new EmailOtp
+        {
+            Email = email,
+            OtpCode = code,
+            Purpose = purpose,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            Used = false
+        });
+        await uow.CommitAsync();
+        await emailSender.SendAsync(email, "Mã xác thực ECommerceApi",
+            $"Mã OTP của bạn là: {code} (hết hạn sau 10 phút).");
+    }
+
+    public async Task ResendOtpAsync(string email)
+    {
+        var exists = await uow.Repository<User>().Query().AnyAsync(u => u.Email == email);
+        if (!exists) throw new InvalidOperationException("Email chưa đăng ký");
+        await SendOtpAsync(email, "register");
+    }
+
+    public async Task VerifyOtpAsync(string email, string otp)
+    {
+        var otpRepo = uow.Repository<EmailOtp>();
+        var record = await otpRepo.Query()
+            .Where(o => o.Email == email && o.Purpose == "register" && !o.Used)
+            .OrderByDescending(o => o.Id)
+            .FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("Không có mã OTP, hãy yêu cầu gửi lại");
+
+        if (record.ExpiresAt < DateTime.UtcNow)
+            throw new InvalidOperationException("Mã OTP đã hết hạn");
+        if (record.AttemptCount >= 5)
+            throw new InvalidOperationException("Nhập sai quá nhiều lần, hãy yêu cầu mã mới");
+
+        if (record.OtpCode != otp)
+        {
+            record.AttemptCount++;
+            otpRepo.Update(record);
+            await uow.CommitAsync();
+            throw new InvalidOperationException("Mã OTP không đúng");
+        }
+
+        record.Used = true;
+        otpRepo.Update(record);
+
+        var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Email == email);
+        if (user is not null)
+        {
+            user.EmailConfirmed = true;
+            uow.Repository<User>().Update(user);
+        }
+        await uow.CommitAsync();
     }
 }
