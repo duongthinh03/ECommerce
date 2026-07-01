@@ -23,6 +23,7 @@
         public OrderStatus Status { get; set; } = OrderStatus.Pending;
         public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
         public string PaymentMethod { get; set; } = "COD";
+        public DateTime? PaidAt { get; set; }          // thời điểm nhận thanh toán (SePay)
         public string? Note { get; set; }
 
         public ICollection<OrderItem> Items { get; set; } = [];

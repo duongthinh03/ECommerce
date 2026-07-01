@@ -15,6 +15,7 @@
         public string ShipPhone { get; set; } = null!;
         public string ShipAddress { get; set; } = null!;
         public string? Note { get; set; }
+        public string? PaymentQrUrl { get; set; }   // URL ảnh VietQR (đơn SePay chưa thanh toán)
         public DateTime CreatedAt { get; set; }
         public List<OrderItemDto> Items { get; set; } = [];
     }

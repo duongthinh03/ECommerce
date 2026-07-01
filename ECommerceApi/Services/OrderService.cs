@@ -6,9 +6,14 @@ using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace ECommerceApi.Services
 {
-    public class OrderService(IUnitOfWork uow, ICouponService couponService) : IOrderService
+    public class OrderService(IUnitOfWork uow, ICouponService couponService, IPaymentService paymentService) : IOrderService
     {
         private const decimal FlatShippingFee = 30000m;   // phí ship phẳng (MVP)
+
+        // chuyển khoản qua SePay (VietQR) — phân biệt với COD
+        private static bool IsBankTransfer(string method) =>
+            method.Equals("SePay", StringComparison.OrdinalIgnoreCase)
+            || method.Equals("BankTransfer", StringComparison.OrdinalIgnoreCase);
 
         public async Task<OrderDto> CheckoutAsync(int userId, CheckoutRequest request)
         {
@@ -25,6 +30,7 @@ namespace ECommerceApi.Services
             await uow.BeginAsync();
             try
             {
+                var bankTransfer = IsBankTransfer(request.PaymentMethod);
                 var order = new Order
                 {
                     OrderCode = GenerateOrderCode(),
@@ -37,7 +43,8 @@ namespace ECommerceApi.Services
                     ShipAddressLine = request.ShipAddressLine,
                     PaymentMethod = request.PaymentMethod,
                     Note = request.Note,
-                    Status = OrderStatus.Confirmed,        // COD: xác nhận luôn
+                    // SePay: chờ thanh toán rồi mới confirm; COD: xác nhận luôn
+                    Status = bankTransfer ? OrderStatus.Pending : OrderStatus.Confirmed,
                     PaymentStatus = PaymentStatus.Unpaid,
                     ShippingFee = FlatShippingFee,
                     DiscountAmount = 0
@@ -91,8 +98,8 @@ namespace ECommerceApi.Services
 
                 order.StatusHistories.Add(new OrderStatusHistory
                 {
-                    Status = OrderStatus.Confirmed,
-                    Note = "Đơn được tạo",
+                    Status = order.Status,
+                    Note = bankTransfer ? "Đơn được tạo — chờ thanh toán chuyển khoản" : "Đơn được tạo",
                     ChangedBy = "system"
                 });
 
@@ -148,7 +155,12 @@ namespace ECommerceApi.Services
                 .Include(o => o.Items)
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy đơn id={orderId}");
-            return ToDto(order);
+
+            var dto = ToDto(order);
+            // đơn SePay chưa thanh toán → kèm QR để FE hiển thị lại
+            if (IsBankTransfer(order.PaymentMethod) && order.PaymentStatus != PaymentStatus.Paid)
+                dto.PaymentQrUrl = paymentService.BuildQrUrl(order.OrderCode, order.FinalAmount);
+            return dto;
         }
 
         // --- Admin ---

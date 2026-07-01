@@ -40,6 +40,9 @@ namespace ECommerceApi.Data
         // --- Email OTP (Phase 2) ---
         public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
 
+        // --- Thanh toán SePay (Phase 2) ---
+        public DbSet<SepayTransaction> SepayTransactions => Set<SepayTransaction>();
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
