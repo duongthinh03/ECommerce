@@ -1,14 +1,20 @@
-﻿using ECommerceApi.DTOs.Order;
+﻿using ECommerceApi.Common;
+using ECommerceApi.DTOs.Order;
 using ECommerceApi.Models;
 using ECommerceApi.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace ECommerceApi.Services
 {
-    public class OrderService(IUnitOfWork uow, ICouponService couponService, IPaymentService paymentService, IOrderNotifier notifier) : IOrderService
+    public class OrderService(
+        IUnitOfWork uow, ICouponService couponService, IPaymentService paymentService,
+        IOrderNotifier notifier, IOptions<SePaySettings> sepayOptions, ILogger<OrderService> logger) : IOrderService
     {
         private const decimal FlatShippingFee = 30000m;   // phí ship phẳng (MVP)
+        private readonly SePaySettings _sepay = sepayOptions.Value;
 
         // chuyển khoản qua SePay (VietQR) — phân biệt với COD
         private static bool IsBankTransfer(string method) =>
@@ -213,6 +219,69 @@ namespace ECommerceApi.Services
                 await notifier.StatusChangedAsync(order, order.User.Email, order.User.FullName);
 
             return ToDto(order);
+        }
+
+        // Job nền: tự hủy đơn chuyển khoản chưa thanh toán quá hạn → hoàn kho + hoàn coupon.
+        public async Task<int> CancelExpiredUnpaidOrdersAsync()
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-_sepay.ExpiryMinutes);
+
+            var orderRepo = uow.Repository<Order>();
+            var expired = await orderRepo.Query()
+                .Include(o => o.Items)
+                .Where(o => o.PaymentStatus != PaymentStatus.Paid
+                            && o.Status == OrderStatus.Pending
+                            && (o.PaymentMethod == "SePay" || o.PaymentMethod == "BankTransfer")
+                            && o.CreatedAt < cutoff)
+                .ToListAsync();
+
+            if (expired.Count == 0) return 0;
+
+            var variantRepo = uow.Repository<ProductVariant>();
+            var usageRepo = uow.Repository<CouponUsage>();
+            var couponRepo = uow.Repository<Coupon>();
+
+            foreach (var order in expired)
+            {
+                // 1) HOÀN KHO (đảo lại việc trừ kho lúc tạo đơn)
+                foreach (var item in order.Items)
+                {
+                    var variant = await variantRepo.GetByIdAsync(item.VariantId);
+                    if (variant is not null)
+                    {
+                        variant.Stock += item.Quantity;
+                        variantRepo.Update(variant);
+                    }
+                }
+
+                // 2) HOÀN COUPON (nếu đơn có dùng) — trả lượt + xóa usage
+                var usage = await usageRepo.Query().FirstOrDefaultAsync(u => u.OrderId == order.Id);
+                if (usage is not null)
+                {
+                    var coupon = await couponRepo.GetByIdAsync(usage.CouponId);
+                    if (coupon is not null && coupon.UsedCount > 0)
+                    {
+                        coupon.UsedCount--;
+                        couponRepo.Update(coupon);
+                    }
+                    usageRepo.HardDelete(usage);   // xóa cứng để không tính vào giới hạn/lượt
+                }
+
+                // 3) HỦY ĐƠN + ghi lịch sử
+                order.Status = OrderStatus.Cancelled;
+                orderRepo.Update(order);
+                await uow.Repository<OrderStatusHistory>().AddAsync(new OrderStatusHistory
+                {
+                    OrderId = order.Id,
+                    Status = OrderStatus.Cancelled,
+                    Note = $"Tự hủy: quá hạn thanh toán {_sepay.ExpiryMinutes} phút",
+                    ChangedBy = "system"
+                });
+            }
+
+            await uow.SaveChangesAsync();   // 1 lần lưu atomic cho cả lô
+            logger.LogInformation("Đã tự hủy {Count} đơn chuyển khoản quá hạn (hoàn kho + coupon).", expired.Count);
+            return expired.Count;
         }
 
         private static string GenerateOrderCode() =>

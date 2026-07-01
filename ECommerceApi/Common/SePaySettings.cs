@@ -12,4 +12,5 @@ public class SePaySettings
     public string BankCode { get; set; } = "";     // mã/tên ngắn ngân hàng (vd: Vietcombank, MB, ACB)
     public string ApiKey { get; set; } = "";       // key xác thực webhook (header: Authorization: Apikey <key>)
     public string QrTemplate { get; set; } = "compact";   // empty | compact | qronly
+    public int ExpiryMinutes { get; set; } = 15;   // đơn chuyển khoản chưa trả quá số phút này → tự hủy + hoàn kho
 }

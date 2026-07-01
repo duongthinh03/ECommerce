@@ -63,6 +63,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
             ClockSkew = TimeSpan.Zero
         };
+        // Đọc access token từ cookie httpOnly khi request không kèm Authorization header
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                if (string.IsNullOrEmpty(ctx.Token) &&
+                    ctx.Request.Cookies.TryGetValue(AuthCookies.Access, out var cookieToken))
+                    ctx.Token = cookieToken;
+                return Task.CompletedTask;
+            }
+        };
     });
 builder.Services.AddAuthorization();
 
@@ -78,6 +89,7 @@ builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.Configure<SePaySettings>(builder.Configuration.GetSection(SePaySettings.SectionName));
+builder.Services.AddHostedService<OrderExpiryWorker>();   // tự hủy đơn SePay quá hạn (hoàn kho + coupon)
 // Email: có Smtp:Password (user-secrets) → gửi thật; chưa có → log ra console (dev)
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection(SmtpSettings.SectionName));
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Smtp:Password"]))

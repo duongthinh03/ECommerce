@@ -58,7 +58,13 @@ public partial class PaymentService(
             var order = await orderRepo.Query()
                 .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.OrderCode == m.Value);
-            if (order is not null
+            if (order is not null && order.Status == OrderStatus.Cancelled)
+            {
+                // Đơn đã bị hủy (quá hạn) mà tiền vẫn về → kho đã hoàn, KHÔNG confirm. Cần hoàn tiền thủ công.
+                logger.LogWarning("⚠️ Nhận tiền cho đơn ĐÃ HỦY {Code} ({Amount:N0}đ) — cần hoàn tiền thủ công",
+                    order.OrderCode, payload.TransferAmount);
+            }
+            else if (order is not null
                 && order.PaymentStatus != PaymentStatus.Paid
                 && payload.TransferAmount >= order.FinalAmount)   // đủ tiền (cho phép trả dư)
             {

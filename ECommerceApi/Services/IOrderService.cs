@@ -13,5 +13,8 @@ namespace ECommerceApi.Services
         Task<IEnumerable<OrderDto>> GetAllAsync();
         Task<OrderDto> GetAdminByIdAsync(int orderId);
         Task<OrderDto> UpdateStatusAsync(int orderId, OrderStatus status, string? note, string changedBy);
+
+        // Job nền: tự hủy đơn chuyển khoản quá hạn chưa thanh toán (hoàn kho + hoàn coupon). Trả số đơn đã hủy.
+        Task<int> CancelExpiredUnpaidOrdersAsync();
     }
 }
