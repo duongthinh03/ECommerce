@@ -6,7 +6,7 @@ using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace ECommerceApi.Services
 {
-    public class OrderService(IUnitOfWork uow, ICouponService couponService, IPaymentService paymentService) : IOrderService
+    public class OrderService(IUnitOfWork uow, ICouponService couponService, IPaymentService paymentService, IOrderNotifier notifier) : IOrderService
     {
         private const decimal FlatShippingFee = 30000m;   // phí ship phẳng (MVP)
 
@@ -130,6 +130,11 @@ namespace ECommerceApi.Services
                 // ══ COMMIT (lưu usage + commit transaction) ══
                 await uow.CommitAsync();
 
+                // email xác nhận đơn (lỗi gửi không chặn — notifier tự nuốt)
+                var buyer = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == userId);
+                if (buyer is not null)
+                    await notifier.OrderPlacedAsync(order, buyer.Email, buyer.FullName);
+
                 return await GetByIdAsync(userId, order.Id);
             }
             catch
@@ -187,6 +192,7 @@ namespace ECommerceApi.Services
             var repo = uow.Repository<Order>();
             var order = await repo.Query()
                 .Include(o => o.Items)
+                .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.Id == orderId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy đơn id={orderId}");
 
@@ -201,6 +207,11 @@ namespace ECommerceApi.Services
                 ChangedBy = changedBy
             });
             await uow.CommitAsync();
+
+            // email báo đổi trạng thái cho khách
+            if (order.User is not null)
+                await notifier.StatusChangedAsync(order, order.User.Email, order.User.FullName);
+
             return ToDto(order);
         }
 

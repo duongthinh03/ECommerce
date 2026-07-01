@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 namespace ECommerceApi.Services;
 
 public partial class PaymentService(
-    IUnitOfWork uow, IOptions<SePaySettings> options, ILogger<PaymentService> logger) : IPaymentService
+    IUnitOfWork uow, IOptions<SePaySettings> options, ILogger<PaymentService> logger, IOrderNotifier notifier) : IPaymentService
 {
     private readonly SePaySettings _s = options.Value;
 
@@ -49,12 +49,15 @@ public partial class PaymentService(
 
         // khớp đơn: tìm OrderCode (ORD + số) trong nội dung chuyển khoản
         int? matchedOrderId = null;
+        Order? paidOrder = null;
         var content = payload.Content ?? "";
         var m = OrderCodeRegex().Match(content);
         if (m.Success)
         {
             var orderRepo = uow.Repository<Order>();
-            var order = await orderRepo.Query().FirstOrDefaultAsync(o => o.OrderCode == m.Value);
+            var order = await orderRepo.Query()
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.OrderCode == m.Value);
             if (order is not null
                 && order.PaymentStatus != PaymentStatus.Paid
                 && payload.TransferAmount >= order.FinalAmount)   // đủ tiền (cho phép trả dư)
@@ -73,6 +76,7 @@ public partial class PaymentService(
                     ChangedBy = "sepay"
                 });
                 matchedOrderId = order.Id;
+                paidOrder = order;
                 logger.LogInformation("💰 Đơn {Code} đã thanh toán qua SePay", order.OrderCode);
             }
         }
@@ -91,6 +95,10 @@ public partial class PaymentService(
             OrderId = matchedOrderId
         });
         await uow.CommitAsync();
+
+        // email báo đã nhận thanh toán (sau commit; notifier tự nuốt lỗi)
+        if (paidOrder?.User is not null)
+            await notifier.PaymentReceivedAsync(paidOrder, paidOrder.User.Email, paidOrder.User.FullName);
 
         return matchedOrderId is not null;
     }
