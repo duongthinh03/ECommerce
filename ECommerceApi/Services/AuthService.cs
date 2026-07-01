@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using ECommerceApi.Common;
 using ECommerceApi.DTOs.Auth;
 using ECommerceApi.Models;
@@ -62,12 +64,13 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
         if (!user.EmailConfirmed)
             throw new UnauthorizedAccessException("Email chưa xác thực. Vui lòng nhập mã OTP gửi tới email.");
 
-        // 2FA: bật thì phải kèm mã đúng mới cấp token
+        // 2FA: bật thì phải kèm mã đúng (mã app HOẶC recovery code) mới cấp token
         if (user.Is2FAEnabled)
         {
             if (string.IsNullOrWhiteSpace(request.TwoFactorCode))
                 return new AuthResponse { Requires2FA = true };   // báo FE hiện ô nhập mã
-            if (!VerifyTotp(user.TwoFASecret, request.TwoFactorCode))
+            var okTotp = VerifyTotp(user.TwoFASecret, request.TwoFactorCode);
+            if (!okTotp && !await TryUseRecoveryCodeAsync(user.Id, request.TwoFactorCode))
                 throw new UnauthorizedAccessException("Mã xác thực 2 lớp không đúng");
         }
 
@@ -204,7 +207,7 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
         return new TwoFactorSetupResponse { Secret = base32, OtpauthUri = uri };
     }
 
-    public async Task EnableTwoFactorAsync(int userId, string code)
+    public async Task<IReadOnlyList<string>> EnableTwoFactorAsync(int userId, string code)
     {
         var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == userId)
             ?? throw new KeyNotFoundException("Không tìm thấy user");
@@ -215,7 +218,18 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
 
         user.Is2FAEnabled = true;
         uow.Repository<User>().Update(user);
+
+        // sinh recovery codes mới (xóa cũ nếu bật lại) — lưu hash, trả plaintext 1 lần
+        var recRepo = uow.Repository<TwoFactorRecoveryCode>();
+        foreach (var old in await recRepo.Query().Where(r => r.UserId == userId).ToListAsync())
+            recRepo.HardDelete(old);
+
+        var codes = GenerateRecoveryCodes(8);
+        foreach (var c in codes)
+            await recRepo.AddAsync(new TwoFactorRecoveryCode { UserId = userId, CodeHash = BC.HashPassword(c) });
+
         await uow.CommitAsync();
+        return codes;
     }
 
     public async Task DisableTwoFactorAsync(int userId, string code)
@@ -229,6 +243,12 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
         user.Is2FAEnabled = false;
         user.TwoFASecret = null;
         uow.Repository<User>().Update(user);
+
+        // xóa luôn recovery codes
+        var recRepo = uow.Repository<TwoFactorRecoveryCode>();
+        foreach (var rc in await recRepo.Query().Where(r => r.UserId == userId).ToListAsync())
+            recRepo.HardDelete(rc);
+
         await uow.CommitAsync();
     }
 
@@ -240,5 +260,45 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
         if (string.IsNullOrEmpty(secret) || string.IsNullOrWhiteSpace(code)) return false;
         var totp = new Totp(Base32Encoding.ToBytes(secret));
         return totp.VerifyTotp(code.Trim(), out _, new VerificationWindow(previous: 1, future: 1));
+    }
+
+    // Sinh N recovery code dạng "abcde-fghij" (bỏ ký tự dễ nhầm i/l/o/0/1)
+    private static List<string> GenerateRecoveryCodes(int count)
+    {
+        const string chars = "abcdefghjkmnpqrstuvwxyz23456789";
+        var codes = new List<string>(count);
+        for (int i = 0; i < count; i++)
+        {
+            var bytes = RandomNumberGenerator.GetBytes(10);
+            var sb = new StringBuilder(11);
+            for (int j = 0; j < bytes.Length; j++)
+            {
+                if (j == 5) sb.Append('-');
+                sb.Append(chars[bytes[j] % chars.Length]);
+            }
+            codes.Add(sb.ToString());
+        }
+        return codes;
+    }
+
+    // Đối chiếu code với recovery codes chưa dùng của user; khớp thì đánh dấu đã dùng.
+    private async Task<bool> TryUseRecoveryCodeAsync(int userId, string code)
+    {
+        var normalized = code.Trim().ToLowerInvariant();
+        var recRepo = uow.Repository<TwoFactorRecoveryCode>();
+        var candidates = await recRepo.Query()
+            .Where(r => r.UserId == userId && r.UsedAt == null)
+            .ToListAsync();
+        foreach (var rc in candidates)
+        {
+            if (BC.Verify(normalized, rc.CodeHash))
+            {
+                rc.UsedAt = DateTime.UtcNow;
+                recRepo.Update(rc);
+                await uow.CommitAsync();
+                return true;
+            }
+        }
+        return false;
     }
 }

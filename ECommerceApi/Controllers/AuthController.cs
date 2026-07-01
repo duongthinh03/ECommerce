@@ -80,8 +80,8 @@ namespace ECommerceApi.Controllers
         [HttpPost("2fa/enable")]
         public async Task<IActionResult> Enable2FA([FromBody] TwoFactorCodeRequest req)
         {
-            await authService.EnableTwoFactorAsync(CurrentUserId ?? 0, req.Code);
-            return OkResponse<object?>(null, "Đã bật xác thực 2 lớp");
+            var recoveryCodes = await authService.EnableTwoFactorAsync(CurrentUserId ?? 0, req.Code);
+            return OkResponse(new { recoveryCodes }, "Đã bật xác thực 2 lớp");
         }
 
         [Authorize]

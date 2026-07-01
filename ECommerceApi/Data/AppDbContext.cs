@@ -43,6 +43,9 @@ namespace ECommerceApi.Data
         // --- Thanh toán SePay (Phase 2) ---
         public DbSet<SepayTransaction> SepayTransactions => Set<SepayTransaction>();
 
+        // --- 2FA recovery codes (Phase 2) ---
+        public DbSet<TwoFactorRecoveryCode> TwoFactorRecoveryCodes => Set<TwoFactorRecoveryCode>();
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -12,7 +12,7 @@ public interface IAuthService
 
     // 2FA (TOTP)
     Task<TwoFactorSetupResponse> SetupTwoFactorAsync(int userId);
-    Task EnableTwoFactorAsync(int userId, string code);
+    Task<IReadOnlyList<string>> EnableTwoFactorAsync(int userId, string code);   // trả recovery codes
     Task DisableTwoFactorAsync(int userId, string code);
     Task<bool> IsTwoFactorEnabledAsync(int userId);
 }
