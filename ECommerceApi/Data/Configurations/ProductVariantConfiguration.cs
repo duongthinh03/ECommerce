@@ -14,6 +14,8 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
         builder.Property(v => v.Sku).HasMaxLength(100).IsRequired();
         builder.HasIndex(v => v.Sku).IsUnique();
 
+        builder.Property(v => v.OptionName).HasMaxLength(100);
+
         builder.Property(v => v.Price).HasPrecision(18, 2);
         builder.Property(v => v.CompareAtPrice).HasPrecision(18, 2);
         builder.Property(v => v.Weight).HasPrecision(18, 3);

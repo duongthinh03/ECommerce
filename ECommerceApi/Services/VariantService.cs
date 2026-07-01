@@ -38,6 +38,7 @@ public class VariantService(IUnitOfWork uow) : IVariantService
         {
             ProductId = productId,                // gán từ route
             Sku = request.Sku,
+            OptionName = request.OptionName,
             Price = request.Price,
             CompareAtPrice = request.CompareAtPrice,
             Stock = request.Stock,
@@ -63,6 +64,7 @@ public class VariantService(IUnitOfWork uow) : IVariantService
             throw new InvalidOperationException($"Sku '{request.Sku}' đã tồn tại");
 
         variant.Sku = request.Sku;
+        variant.OptionName = request.OptionName;
         variant.Price = request.Price;
         variant.CompareAtPrice = request.CompareAtPrice;
         variant.Stock = request.Stock;
@@ -99,6 +101,7 @@ public class VariantService(IUnitOfWork uow) : IVariantService
         Id = v.Id,
         ProductId = v.ProductId,
         Sku = v.Sku,
+        OptionName = v.OptionName,
         Price = v.Price,
         CompareAtPrice = v.CompareAtPrice,
         Stock = v.Stock,

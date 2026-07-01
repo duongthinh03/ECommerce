@@ -5,6 +5,7 @@ public class VariantDto
     public int Id { get; set; }
     public int ProductId { get; set; }
     public string Sku { get; set; } = null!;
+    public string? OptionName { get; set; }
     public decimal Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
     public int Stock { get; set; }
