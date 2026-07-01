@@ -4,7 +4,9 @@ using ECommerceApi.Models;
 using ECommerceApi.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OtpNet;
 using BC = BCrypt.Net.BCrypt;
+using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace ECommerceApi.Services;
 
@@ -59,6 +61,15 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
 
         if (!user.EmailConfirmed)
             throw new UnauthorizedAccessException("Email chưa xác thực. Vui lòng nhập mã OTP gửi tới email.");
+
+        // 2FA: bật thì phải kèm mã đúng mới cấp token
+        if (user.Is2FAEnabled)
+        {
+            if (string.IsNullOrWhiteSpace(request.TwoFactorCode))
+                return new AuthResponse { Requires2FA = true };   // báo FE hiện ô nhập mã
+            if (!VerifyTotp(user.TwoFASecret, request.TwoFactorCode))
+                throw new UnauthorizedAccessException("Mã xác thực 2 lớp không đúng");
+        }
 
         user.LastLoginAt = DateTime.UtcNow;
         uow.Repository<User>().Update(user);
@@ -176,5 +187,58 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
             uow.Repository<User>().Update(user);
         }
         await uow.CommitAsync();
+    }
+
+    // ===== 2FA (TOTP) =====
+    public async Task<TwoFactorSetupResponse> SetupTwoFactorAsync(int userId)
+    {
+        var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+
+        var base32 = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
+        user.TwoFASecret = base32;      // lưu secret; CHƯA bật tới khi xác nhận mã
+        uow.Repository<User>().Update(user);
+        await uow.CommitAsync();
+
+        var uri = $"otpauth://totp/ShopViet:{Uri.EscapeDataString(user.Email)}?secret={base32}&issuer=ShopViet&digits=6&period=30";
+        return new TwoFactorSetupResponse { Secret = base32, OtpauthUri = uri };
+    }
+
+    public async Task EnableTwoFactorAsync(int userId, string code)
+    {
+        var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+        if (string.IsNullOrEmpty(user.TwoFASecret))
+            throw new InvalidOperationException("Chưa thiết lập 2FA — hãy quét mã trước");
+        if (!VerifyTotp(user.TwoFASecret, code))
+            throw new UnauthorizedAccessException("Mã xác thực 2 lớp không đúng");
+
+        user.Is2FAEnabled = true;
+        uow.Repository<User>().Update(user);
+        await uow.CommitAsync();
+    }
+
+    public async Task DisableTwoFactorAsync(int userId, string code)
+    {
+        var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+        if (!user.Is2FAEnabled) return;
+        if (!VerifyTotp(user.TwoFASecret, code))
+            throw new UnauthorizedAccessException("Mã xác thực 2 lớp không đúng");
+
+        user.Is2FAEnabled = false;
+        user.TwoFASecret = null;
+        uow.Repository<User>().Update(user);
+        await uow.CommitAsync();
+    }
+
+    public async Task<bool> IsTwoFactorEnabledAsync(int userId) =>
+        await uow.Repository<User>().Query().Where(u => u.Id == userId).Select(u => u.Is2FAEnabled).FirstOrDefaultAsync();
+
+    private static bool VerifyTotp(string? secret, string code)
+    {
+        if (string.IsNullOrEmpty(secret) || string.IsNullOrWhiteSpace(code)) return false;
+        var totp = new Totp(Base32Encoding.ToBytes(secret));
+        return totp.VerifyTotp(code.Trim(), out _, new VerificationWindow(previous: 1, future: 1));
     }
 }

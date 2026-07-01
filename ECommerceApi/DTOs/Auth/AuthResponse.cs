@@ -6,6 +6,7 @@ public class AuthResponse
     public string RefreshToken { get; set; } = null!;
     public DateTime AccessTokenExpiresAt { get; set; }
     public UserInfo User { get; set; } = null!;
+    public bool Requires2FA { get; set; }   // true = cần nhập mã 2FA rồi login lại (chưa cấp token)
 }
 
 public class UserInfo

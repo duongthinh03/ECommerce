@@ -9,4 +9,10 @@ public interface IAuthService
     Task<AuthResponse> RefreshAsync(string refreshToken);
     Task VerifyOtpAsync(string email, string otp);
     Task ResendOtpAsync(string email);
+
+    // 2FA (TOTP)
+    Task<TwoFactorSetupResponse> SetupTwoFactorAsync(int userId);
+    Task EnableTwoFactorAsync(int userId, string code);
+    Task DisableTwoFactorAsync(int userId, string code);
+    Task<bool> IsTwoFactorEnabledAsync(int userId);
 }

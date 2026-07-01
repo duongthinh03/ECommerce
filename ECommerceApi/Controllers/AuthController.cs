@@ -26,6 +26,8 @@ namespace ECommerceApi.Controllers
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var response = await authService.LoginAsync(request);
+            if (response.Requires2FA)   // cần mã 2FA → chưa cấp cookie, báo FE nhập mã
+                return OkResponse(response, "Cần mã xác thực 2 lớp");
             AuthCookies.SetAuth(Response, response, _jwt.RefreshTokenDays, CookieSecure);
             return OkResponse(response, "Đăng nhập thành công");
         }
@@ -63,6 +65,39 @@ namespace ECommerceApi.Controllers
                 Role = User.FindFirstValue(ClaimTypes.Role) ?? "Customer"
             };
             return OkResponse(user);
+        }
+
+        // ===== 2FA (TOTP) =====
+        [Authorize]
+        [HttpPost("2fa/setup")]
+        public async Task<IActionResult> Setup2FA()
+        {
+            var r = await authService.SetupTwoFactorAsync(CurrentUserId ?? 0);
+            return OkResponse(r);
+        }
+
+        [Authorize]
+        [HttpPost("2fa/enable")]
+        public async Task<IActionResult> Enable2FA([FromBody] TwoFactorCodeRequest req)
+        {
+            await authService.EnableTwoFactorAsync(CurrentUserId ?? 0, req.Code);
+            return OkResponse<object?>(null, "Đã bật xác thực 2 lớp");
+        }
+
+        [Authorize]
+        [HttpPost("2fa/disable")]
+        public async Task<IActionResult> Disable2FA([FromBody] TwoFactorCodeRequest req)
+        {
+            await authService.DisableTwoFactorAsync(CurrentUserId ?? 0, req.Code);
+            return OkResponse<object?>(null, "Đã tắt xác thực 2 lớp");
+        }
+
+        [Authorize]
+        [HttpGet("2fa/status")]
+        public async Task<IActionResult> Status2FA()
+        {
+            var enabled = await authService.IsTwoFactorEnabledAsync(CurrentUserId ?? 0);
+            return OkResponse(new TwoFactorStatusResponse { Enabled = enabled });
         }
 
         [HttpPost("verify-otp")]
