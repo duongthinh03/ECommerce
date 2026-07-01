@@ -32,6 +32,14 @@ namespace ECommerceApi.Controllers
             return OkResponse(response, "Đăng nhập thành công");
         }
 
+        [HttpPost("google")]
+        public async Task<IActionResult> Google([FromBody] GoogleLoginRequest req)
+        {
+            var response = await authService.GoogleLoginAsync(req.IdToken);
+            AuthCookies.SetAuth(Response, response, _jwt.RefreshTokenDays, CookieSecure);
+            return OkResponse(response, "Đăng nhập Google thành công");
+        }
+
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest? request)
         {

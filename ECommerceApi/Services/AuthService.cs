@@ -4,6 +4,7 @@ using ECommerceApi.Common;
 using ECommerceApi.DTOs.Auth;
 using ECommerceApi.Models;
 using ECommerceApi.UnitOfWork;
+using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OtpNet;
@@ -12,10 +13,11 @@ using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace ECommerceApi.Services;
 
-public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<JwtSettings> jwtOptions, IEmailSender emailSender, ILogger<AuthService> logger) : IAuthService
+public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<JwtSettings> jwtOptions, IEmailSender emailSender, ILogger<AuthService> logger, IOptions<GoogleSettings> googleOptions) : IAuthService
 {
     private const int CustomerRoleId = 4;   // seed: 1 Admin, 2 Manager, 3 Staff, 4 Customer
     private readonly JwtSettings _jwt = jwtOptions.Value;
+    private readonly GoogleSettings _google = googleOptions.Value;
 
     public async Task RegisterAsync(RegisterRequest request)
     {
@@ -77,6 +79,57 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
         user.LastLoginAt = DateTime.UtcNow;
         uow.Repository<User>().Update(user);
         await uow.CommitAsync();
+
+        return await IssueTokensAsync(user, user.Role?.Name);
+    }
+
+    public async Task<AuthResponse> GoogleLoginAsync(string idToken)
+    {
+        if (string.IsNullOrWhiteSpace(_google.ClientId))
+            throw new InvalidOperationException("Chưa cấu hình Google ClientId");
+
+        GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            payload = await GoogleJsonWebSignature.ValidateAsync(idToken, new GoogleJsonWebSignature.ValidationSettings
+            {
+                Audience = new[] { _google.ClientId }
+            });
+        }
+        catch
+        {
+            throw new UnauthorizedAccessException("Token Google không hợp lệ");
+        }
+
+        var users = uow.Repository<User>();
+        var user = await users.Query().Include(u => u.Role).FirstOrDefaultAsync(u => u.Email == payload.Email);
+
+        if (user is null)
+        {
+            // Chưa có → tạo tài khoản mới từ Google (email đã được Google xác thực)
+            user = new User
+            {
+                Email = payload.Email,
+                FullName = string.IsNullOrWhiteSpace(payload.Name) ? payload.Email : payload.Name,
+                PasswordHash = BC.HashPassword(Guid.NewGuid().ToString("N")),   // mật khẩu ngẫu nhiên — đăng nhập qua Google
+                RoleId = CustomerRoleId,
+                EmailConfirmed = true,
+                Provider = "Google",
+                ProviderId = payload.Subject,
+                IsActive = true
+            };
+            await users.AddAsync(user);
+            await uow.CommitAsync();
+        }
+        else
+        {
+            // Đã có (vd account 2014) → liên kết Google + đăng nhập luôn
+            if (user.Provider is null) { user.Provider = "Google"; user.ProviderId = payload.Subject; }
+            if (!user.EmailConfirmed) user.EmailConfirmed = true;
+            user.LastLoginAt = DateTime.UtcNow;
+            users.Update(user);
+            await uow.CommitAsync();
+        }
 
         return await IssueTokensAsync(user, user.Role?.Name);
     }
