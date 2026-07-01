@@ -13,8 +13,6 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
-    <PackageReference Include="HotChocolate.AspNetCore" Version="16.3.0" />
-    <PackageReference Include="HotChocolate.Data.EntityFramework" Version="16.3.0" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.4" />
@@ -29,10 +27,6 @@
 
   <ItemGroup>
     <Folder Include="Data\Migrations\" />
-    <Folder Include="GraphQL\Mutations\" />
-    <Folder Include="GraphQL\Inputs\" />
-    <Folder Include="GraphQL\Queries\" />
-    <Folder Include="GraphQL\Types\" />
   </ItemGroup>
 
 </Project>

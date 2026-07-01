@@ -379,3 +379,6 @@ bk-db/
 # Local secrets / env — KHÔNG đẩy lên repo
 .env
 **/appsettings.Development.json
+# Anh upload (khong commit noi dung, giu thu muc)
+ECommerceApi/wwwroot/uploads/*
+!ECommerceApi/wwwroot/uploads/.gitkeep

@@ -109,6 +109,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();   // phục vụ ảnh upload ở wwwroot/uploads
 app.UseCors(CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
