@@ -16,5 +16,7 @@ namespace ECommerceApi.DTOs.Catalog
         public string? Thumbnail { get; set; }
         public bool IsActive { get; set; }
         public bool InStock { get; set; }   // còn hàng? = có ≥1 variant active và Stock > 0
+        public double AvgRating { get; set; }   // điểm đánh giá trung bình (0 nếu chưa có)
+        public int ReviewCount { get; set; }    // số lượt đánh giá
     }
 }

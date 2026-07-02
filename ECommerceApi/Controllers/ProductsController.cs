@@ -10,9 +10,9 @@ namespace ECommerceApi.Controllers
     {
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] ProductSearchQuery query)
         {
-            var response = await service.GetAllAsync();
+            var response = await service.SearchAsync(query);
             return OkResponse(response);
         }
 

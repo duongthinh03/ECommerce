@@ -46,6 +46,10 @@ namespace ECommerceApi.Data
         // --- 2FA recovery codes (Phase 2) ---
         public DbSet<TwoFactorRecoveryCode> TwoFactorRecoveryCodes => Set<TwoFactorRecoveryCode>();
 
+        // --- Review + Wishlist (Phase 3) ---
+        public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+        public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

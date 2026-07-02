@@ -1,3 +1,4 @@
+using ECommerceApi.Common;
 using ECommerceApi.DTOs.Catalog;
 using ECommerceApi.Models;
 using ECommerceApi.UnitOfWork;
@@ -8,15 +9,53 @@ namespace ECommerceApi.Services;
 
 public class ProductService(IUnitOfWork uow) : IProductService
 {
-    public async Task<IEnumerable<ProductDto>> GetAllAsync()
+    public async Task<PagedResult<ProductDto>> SearchAsync(ProductSearchQuery query)
     {
-        var products = await uow.Repository<Product>().Query()
+        IQueryable<Product> q = uow.Repository<Product>().Query()
             .Include(p => p.Category)        // 🆕 nạp navigation để lấy CategoryName
             .Include(p => p.Brand)
-            .Include(p => p.Variants)        // để tính còn hàng (InStock)
-            .OrderByDescending(p => p.Id)
+            .Include(p => p.Variants);       // để tính còn hàng (InStock)
+
+        // ----- Lọc -----
+        if (!string.IsNullOrWhiteSpace(query.Q))
+        {
+            var term = query.Q.Trim();
+            q = q.Where(p => p.Name.Contains(term));
+        }
+        if (query.CategoryId is int cid)
+            q = q.Where(p => p.CategoryId == cid);
+        if (query.MinPrice is decimal min)
+            q = q.Where(p => p.DisplayPrice >= min);
+        if (query.MaxPrice is decimal max)
+            q = q.Where(p => p.DisplayPrice <= max);
+        if (query.InStock == true)
+            q = q.Where(p => p.Variants.Any(v => v.Stock > 0 && v.IsActive));
+
+        // ----- Sắp xếp -----
+        q = query.Sort switch
+        {
+            "price_asc" => q.OrderBy(p => p.DisplayPrice).ThenByDescending(p => p.Id),
+            "price_desc" => q.OrderByDescending(p => p.DisplayPrice).ThenByDescending(p => p.Id),
+            _ => q.OrderByDescending(p => p.Id),   // newest (mặc định)
+        };
+
+        // ----- Phân trang -----
+        var total = await q.CountAsync();
+        var items = await q
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .ToListAsync();
-        return products.Select(ToDto);
+
+        var dtos = items.Select(ToDto).ToList();
+        await AttachRatingsAsync(dtos);
+
+        return new PagedResult<ProductDto>
+        {
+            Items = dtos,
+            Page = query.Page,
+            PageSize = query.PageSize,
+            TotalCount = total
+        };
     }
 
     public async Task<ProductDto> GetByIdAsync(int id)
@@ -27,7 +66,48 @@ public class ProductService(IUnitOfWork uow) : IProductService
             .Include(p => p.Variants)
             .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new KeyNotFoundException($"Không tìm thấy product id={id}");
-        return ToDto(product);
+        var dto = ToDto(product);
+        await AttachRatingsAsync([dto]);
+        return dto;
+    }
+
+    public async Task<List<ProductDto>> GetByIdsAsync(IReadOnlyList<int> ids)
+    {
+        if (ids.Count == 0) return [];
+        var products = await uow.Repository<Product>().Query()
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.Variants)
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
+
+        var dtos = products.Select(ToDto).ToList();
+        await AttachRatingsAsync(dtos);
+
+        // giữ đúng thứ tự truyền vào (vd wishlist: mới thêm lên đầu)
+        var map = dtos.ToDictionary(d => d.Id);
+        return ids.Where(map.ContainsKey).Select(id => map[id]).ToList();
+    }
+
+    // Nạp điểm đánh giá TB + số lượt cho danh sách DTO bằng 1 query gộp (tránh N+1).
+    private async Task AttachRatingsAsync(List<ProductDto> dtos)
+    {
+        if (dtos.Count == 0) return;
+        var ids = dtos.Select(d => d.Id).ToList();
+        var stats = await uow.Repository<ProductReview>().Query()
+            .Where(r => ids.Contains(r.ProductId))
+            .GroupBy(r => r.ProductId)
+            .Select(g => new { ProductId = g.Key, Avg = g.Average(x => (double)x.Rating), Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProductId);
+
+        foreach (var d in dtos)
+        {
+            if (stats.TryGetValue(d.Id, out var s))
+            {
+                d.AvgRating = Math.Round(s.Avg, 1);
+                d.ReviewCount = s.Count;
+            }
+        }
     }
 
     public async Task<ProductDto> CreateAsync(CreateProductRequest request)
