@@ -1,3 +1,4 @@
+using ECommerceApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -5,7 +6,7 @@ namespace ECommerceApi.Controllers;
 
 [Authorize(Roles = "Admin")]
 [Route("api/upload")]
-public class UploadsController(IWebHostEnvironment env) : ApiControllerBase
+public class UploadsController(IImageStorage storage) : ApiControllerBase
 {
     private static readonly string[] Allowed = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
     private const long MaxBytes = 5 * 1024 * 1024;   // 5MB
@@ -22,17 +23,8 @@ public class UploadsController(IWebHostEnvironment env) : ApiControllerBase
         if (!Allowed.Contains(ext))
             return BadRequestResponse("Chỉ nhận ảnh jpg/png/webp/gif");
 
-        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
-        var dir = Path.Combine(webRoot, "uploads");
-        Directory.CreateDirectory(dir);
-
-        var name = $"{Guid.NewGuid():N}{ext}";
-        var savePath = Path.Combine(dir, name);
-        await using (var stream = System.IO.File.Create(savePath))
-            await file.CopyToAsync(stream);
-
-        // URL tuyệt đối để FE (origin khác) hiển thị <img src> trực tiếp
-        var url = $"{Request.Scheme}://{Request.Host}/uploads/{name}";
+        await using var stream = file.OpenReadStream();
+        var url = await storage.SaveAsync(stream, file.FileName, file.ContentType);
         return OkResponse(new { url }, "Tải ảnh thành công");
     }
 }

@@ -91,6 +91,15 @@ builder.Services.AddScoped<ICouponService, CouponService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.Configure<SePaySettings>(builder.Configuration.GetSection(SePaySettings.SectionName));
 builder.Services.Configure<GoogleSettings>(builder.Configuration.GetSection(GoogleSettings.SectionName));
+
+// Lưu ảnh: có cấu hình Cloudinary → dùng cloud; chưa có → local wwwroot (dev, mất khi redeploy)
+builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection(CloudinarySettings.SectionName));
+var cloudinary = builder.Configuration.GetSection(CloudinarySettings.SectionName).Get<CloudinarySettings>();
+if (cloudinary is not null && !string.IsNullOrWhiteSpace(cloudinary.CloudName) && !string.IsNullOrWhiteSpace(cloudinary.ApiSecret))
+    builder.Services.AddScoped<IImageStorage, CloudinaryImageStorage>();
+else
+    builder.Services.AddScoped<IImageStorage, LocalImageStorage>();
 builder.Services.AddHostedService<OrderExpiryWorker>();   // tự hủy đơn SePay quá hạn (hoàn kho + coupon)
 // Email: có Smtp:Password (user-secrets) → gửi thật; chưa có → log ra console (dev)
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection(SmtpSettings.SectionName));
