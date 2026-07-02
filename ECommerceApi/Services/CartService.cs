@@ -174,7 +174,8 @@ namespace ECommerceApi.Services
                 Sku = i.Variant?.Sku ?? "",
                 Quantity = i.Quantity,
                 Price = i.Price,
-                LineTotal = i.Price * i.Quantity
+                LineTotal = i.Price * i.Quantity,
+                Stock = i.Variant?.Stock ?? 0
             }).ToList();
 
             return new CartDto

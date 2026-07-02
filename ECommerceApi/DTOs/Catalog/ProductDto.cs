@@ -15,5 +15,6 @@ namespace ECommerceApi.DTOs.Catalog
         public int SoldCount { get; set; }
         public string? Thumbnail { get; set; }
         public bool IsActive { get; set; }
+        public bool InStock { get; set; }   // còn hàng? = có ≥1 variant active và Stock > 0
     }
 }

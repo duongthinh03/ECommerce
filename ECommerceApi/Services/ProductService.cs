@@ -13,6 +13,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         var products = await uow.Repository<Product>().Query()
             .Include(p => p.Category)        // 🆕 nạp navigation để lấy CategoryName
             .Include(p => p.Brand)
+            .Include(p => p.Variants)        // để tính còn hàng (InStock)
             .OrderByDescending(p => p.Id)
             .ToListAsync();
         return products.Select(ToDto);
@@ -23,6 +24,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         var product = await uow.Repository<Product>().Query()
             .Include(p => p.Category)
             .Include(p => p.Brand)
+            .Include(p => p.Variants)
             .FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new KeyNotFoundException($"Không tìm thấy product id={id}");
         return ToDto(product);
@@ -113,6 +115,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         ViewCount = p.ViewCount,
         SoldCount = p.SoldCount,
         Thumbnail = p.Thumbnail,
-        IsActive = p.IsActive
+        IsActive = p.IsActive,
+        InStock = p.Variants.Any(v => v.Stock > 0 && v.IsActive)
     };
 }
