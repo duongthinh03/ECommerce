@@ -32,6 +32,14 @@ namespace ECommerceApi.Services
             if (cart is null || cart.Items.Count == 0)
                 throw new InvalidOperationException("Giỏ hàng trống");
 
+            // chỉ đặt các item được chọn (null/rỗng = đặt hết giỏ)
+            var selected = request.SelectedVariantIds;
+            var itemsToOrder = (selected is { Count: > 0 })
+                ? cart.Items.Where(i => selected.Contains(i.VariantId)).ToList()
+                : cart.Items.ToList();
+            if (itemsToOrder.Count == 0)
+                throw new InvalidOperationException("Chưa chọn sản phẩm nào để thanh toán");
+
             // 2) ══ BẮT ĐẦU TRANSACTION ══
             await uow.BeginAsync();
             try
@@ -59,7 +67,7 @@ namespace ECommerceApi.Services
                 decimal subtotal = 0;
                 var variantRepo = uow.Repository<ProductVariant>();
 
-                foreach (var item in cart.Items)
+                foreach (var item in itemsToOrder)
                 {
                     var variant = item.Variant
                         ?? throw new InvalidOperationException("Variant không hợp lệ trong giỏ");
@@ -111,9 +119,9 @@ namespace ECommerceApi.Services
 
                 await uow.Repository<Order>().AddAsync(order);
 
-                // xóa giỏ sau khi đặt
+                // xóa CHỈ các item đã đặt (item không chọn vẫn ở lại giỏ)
                 var cartItemRepo = uow.Repository<CartItem>();
-                foreach (var ci in cart.Items.ToList())
+                foreach (var ci in itemsToOrder)
                     cartItemRepo.Delete(ci);
 
                 // lưu Order trước để lấy Id (transaction vẫn mở)

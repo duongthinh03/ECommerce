@@ -11,5 +11,6 @@
         public string? Note { get; set; }
         public string PaymentMethod { get; set; } = "COD";
         public string? CouponCode { get; set; }   // mã giảm giá (tùy chọn)
+        public List<int>? SelectedVariantIds { get; set; }   // chỉ mua các variant này (null/rỗng = mua hết giỏ)
     }
 }
