@@ -14,6 +14,9 @@ namespace ECommerceApi.Data.Configurations
             builder.Property(o => o.OrderCode).HasMaxLength(30).IsRequired();
             builder.HasIndex(o => o.OrderCode).IsUnique();
 
+            // phục vụ thống kê doanh thu (lọc Status + range CreatedAt)
+            builder.HasIndex(o => new { o.CreatedAt, o.Status });
+
             builder.Property(o => o.ShipRecipient).HasMaxLength(100).IsRequired();
             builder.Property(o => o.ShipPhone).HasMaxLength(20).IsRequired();
             builder.Property(o => o.ShipProvince).HasMaxLength(100).IsRequired();
