@@ -26,6 +26,7 @@ public class ReviewService(IUnitOfWork uow) : IReviewService
             Id = r.Id,
             UserId = r.UserId,
             UserName = r.User.FullName,
+            UserAvatarUrl = r.User.AvatarUrl,
             Rating = r.Rating,
             Comment = r.Comment,
             CreatedAt = r.CreatedAt
@@ -76,6 +77,7 @@ public class ReviewService(IUnitOfWork uow) : IReviewService
             Id = review.Id,
             UserId = userId,
             UserName = user?.FullName ?? "Người dùng",
+            UserAvatarUrl = user?.AvatarUrl,
             Rating = review.Rating,
             Comment = review.Comment,
             CreatedAt = review.CreatedAt

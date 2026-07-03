@@ -23,22 +23,54 @@ namespace ECommerceApi.Services
 
         public async Task<OrderDto> CheckoutAsync(int userId, CheckoutRequest request)
         {
-            // 1) Lấy giỏ user (kèm variant + product)
-            var cart = await uow.Repository<Cart>().Query()
-                .Include(c => c.Items).ThenInclude(i => i.Variant)
-                .Include(c => c.Items).ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync(c => c.UserId == userId);
+            // Nguồn item để đặt: "Mua ngay" (thẳng, không qua giỏ) HOẶC từ giỏ.
+            List<CartItem> itemsToOrder;
+            bool fromCart;
 
-            if (cart is null || cart.Items.Count == 0)
-                throw new InvalidOperationException("Giỏ hàng trống");
+            if (request.BuyNowItem is { Quantity: > 0 } bn)
+            {
+                // ── MUA NGAY: dựng 1 CartItem TẠM (không lưu DB), không đụng giỏ ──
+                fromCart = false;
+                var variant = await uow.Repository<ProductVariant>().Query()
+                    .Include(v => v.Product)
+                    .FirstOrDefaultAsync(v => v.Id == bn.VariantId)
+                    ?? throw new KeyNotFoundException("Không tìm thấy sản phẩm");
+                if (!variant.IsActive)
+                    throw new InvalidOperationException("Sản phẩm này hiện không bán");
 
-            // chỉ đặt các item được chọn (null/rỗng = đặt hết giỏ)
-            var selected = request.SelectedVariantIds;
-            var itemsToOrder = (selected is { Count: > 0 })
-                ? cart.Items.Where(i => selected.Contains(i.VariantId)).ToList()
-                : cart.Items.ToList();
-            if (itemsToOrder.Count == 0)
-                throw new InvalidOperationException("Chưa chọn sản phẩm nào để thanh toán");
+                itemsToOrder =
+                [
+                    new CartItem
+                    {
+                        ProductId = variant.ProductId,
+                        VariantId = variant.Id,
+                        Variant = variant,
+                        Product = variant.Product,
+                        Quantity = bn.Quantity,
+                        Price = variant.Price
+                    }
+                ];
+            }
+            else
+            {
+                // ── TỪ GIỎ: lấy giỏ user (kèm variant + product) ──
+                fromCart = true;
+                var cart = await uow.Repository<Cart>().Query()
+                    .Include(c => c.Items).ThenInclude(i => i.Variant)
+                    .Include(c => c.Items).ThenInclude(i => i.Product)
+                    .FirstOrDefaultAsync(c => c.UserId == userId);
+
+                if (cart is null || cart.Items.Count == 0)
+                    throw new InvalidOperationException("Giỏ hàng trống");
+
+                // chỉ đặt các item được chọn (null/rỗng = đặt hết giỏ)
+                var selected = request.SelectedVariantIds;
+                itemsToOrder = (selected is { Count: > 0 })
+                    ? cart.Items.Where(i => selected.Contains(i.VariantId)).ToList()
+                    : cart.Items.ToList();
+                if (itemsToOrder.Count == 0)
+                    throw new InvalidOperationException("Chưa chọn sản phẩm nào để thanh toán");
+            }
 
             // 2) ══ BẮT ĐẦU TRANSACTION ══
             await uow.BeginAsync();
@@ -119,10 +151,14 @@ namespace ECommerceApi.Services
 
                 await uow.Repository<Order>().AddAsync(order);
 
-                // xóa CHỈ các item đã đặt (item không chọn vẫn ở lại giỏ)
-                var cartItemRepo = uow.Repository<CartItem>();
-                foreach (var ci in itemsToOrder)
-                    cartItemRepo.Delete(ci);
+                // xóa CHỈ các item đã đặt (item không chọn vẫn ở lại giỏ).
+                // Mua ngay (fromCart=false) → item là tạm, KHÔNG đụng giỏ.
+                if (fromCart)
+                {
+                    var cartItemRepo = uow.Repository<CartItem>();
+                    foreach (var ci in itemsToOrder)
+                        cartItemRepo.Delete(ci);
+                }
 
                 // lưu Order trước để lấy Id (transaction vẫn mở)
                 await uow.SaveChangesAsync();

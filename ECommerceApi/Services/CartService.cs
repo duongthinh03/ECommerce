@@ -170,6 +170,7 @@ namespace ECommerceApi.Services
                 Id = i.Id,
                 ProductId = i.ProductId,
                 ProductName = i.Product?.Name ?? "",
+                Thumbnail = i.Variant?.ImageUrl ?? i.Product?.Thumbnail,
                 VariantId = i.VariantId,
                 Sku = i.Variant?.Sku ?? "",
                 Quantity = i.Quantity,

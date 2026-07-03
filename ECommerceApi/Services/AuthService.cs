@@ -178,12 +178,13 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
                 Id = user.Id,
                 Email = user.Email,
                 FullName = user.FullName,
-                Role = roleName ?? "Customer"
+                Role = roleName ?? "Customer",
+                AvatarUrl = user.AvatarUrl
             }
         };
     }
 
-    // sinh + lưu + "gửi" OTP (dev: log ra console)
+    // sinh + lưu + gửi OTP theo mục đích (register / reset)
     private async Task SendOtpAsync(string email, string purpose)
     {
         var code = Random.Shared.Next(100000, 999999).ToString();
@@ -196,26 +197,24 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
             Used = false
         });
         await uow.CommitAsync();
-        await emailSender.SendAsync(email, "Mã xác thực tài khoản ShopViet",
+
+        var (subject, action) = purpose == "reset"
+            ? ("Mã đặt lại mật khẩu ShopViet", "đặt lại mật khẩu")
+            : ("Mã xác thực tài khoản ShopViet", "xác thực tài khoản");
+        await emailSender.SendAsync(email, subject,
             $"Chào bạn,\n\n" +
-            $"Mã OTP xác thực tài khoản ShopViet của bạn là: {code}\n" +
+            $"Mã OTP để {action} ShopViet của bạn là: {code}\n" +
             $"Mã có hiệu lực trong 10 phút.\n\n" +
             $"Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email.\n\n" +
             $"— ShopViet");
     }
 
-    public async Task ResendOtpAsync(string email)
-    {
-        var exists = await uow.Repository<User>().Query().AnyAsync(u => u.Email == email);
-        if (!exists) throw new InvalidOperationException("Email chưa đăng ký");
-        await SendOtpAsync(email, "register");
-    }
-
-    public async Task VerifyOtpAsync(string email, string otp)
+    // Kiểm tra + tiêu thụ OTP theo mục đích; ném lỗi nếu sai/hết hạn/quá số lần.
+    private async Task ConsumeOtpAsync(string email, string otp, string purpose)
     {
         var otpRepo = uow.Repository<EmailOtp>();
         var record = await otpRepo.Query()
-            .Where(o => o.Email == email && o.Purpose == "register" && !o.Used)
+            .Where(o => o.Email == email && o.Purpose == purpose && !o.Used)
             .OrderByDescending(o => o.Id)
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Không có mã OTP, hãy yêu cầu gửi lại");
@@ -235,15 +234,129 @@ public class AuthService(IUnitOfWork uow, ITokenService tokenService, IOptions<J
 
         record.Used = true;
         otpRepo.Update(record);
+        await uow.CommitAsync();
+    }
+
+    public async Task ResendOtpAsync(string email)
+    {
+        var exists = await uow.Repository<User>().Query().AnyAsync(u => u.Email == email);
+        if (!exists) throw new InvalidOperationException("Email chưa đăng ký");
+        await SendOtpAsync(email, "register");
+    }
+
+    public async Task VerifyOtpAsync(string email, string otp)
+    {
+        await ConsumeOtpAsync(email, otp, "register");
 
         var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Email == email);
         if (user is not null)
         {
             user.EmailConfirmed = true;
             uow.Repository<User>().Update(user);
+            await uow.CommitAsync();
         }
+    }
+
+    // ===== Tài khoản =====
+    public async Task<ProfileDto> GetProfileAsync(int userId)
+    {
+        var user = await uow.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+        return ToProfile(user);
+    }
+
+    public async Task<ProfileDto> UpdateProfileAsync(int userId, UpdateProfileRequest request)
+    {
+        var repo = uow.Repository<User>();
+        var user = await repo.Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+
+        user.FullName = request.FullName.Trim();
+        user.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+        user.DateOfBirth = request.DateOfBirth;
+        user.Gender = string.IsNullOrWhiteSpace(request.Gender) ? null : request.Gender;
+        if (request.AvatarUrl is not null)
+            user.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl) ? null : request.AvatarUrl.Trim();
+
+        repo.Update(user);
+        await uow.CommitAsync();
+        return ToProfile(user);
+    }
+
+    public async Task<string?> UpdateAvatarAsync(int userId, string? avatarUrl)
+    {
+        var repo = uow.Repository<User>();
+        var user = await repo.Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+        user.AvatarUrl = avatarUrl;
+        repo.Update(user);
+        await uow.CommitAsync();
+        return avatarUrl;
+    }
+
+    public async Task ChangePasswordAsync(int userId, ChangePasswordRequest request)
+    {
+        var repo = uow.Repository<User>();
+        var user = await repo.Query().FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException("Không tìm thấy user");
+
+        if (!BC.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new UnauthorizedAccessException("Mật khẩu hiện tại không đúng");
+
+        user.PasswordHash = BC.HashPassword(request.NewPassword);
+        repo.Update(user);
+        await RevokeRefreshTokensAsync(userId);   // đăng xuất thiết bị khác
         await uow.CommitAsync();
     }
+
+    public async Task ForgotPasswordAsync(string email)
+    {
+        // Chống dò email: chỉ gửi khi tồn tại, nhưng controller luôn trả OK.
+        var exists = await uow.Repository<User>().Query().AnyAsync(u => u.Email == email);
+        if (!exists) return;
+        try { await SendOtpAsync(email, "reset"); }
+        catch (Exception ex) { logger.LogWarning(ex, "Gửi OTP reset thất bại cho {Email}", email); }
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        var repo = uow.Repository<User>();
+        var user = await repo.Query().FirstOrDefaultAsync(u => u.Email == request.Email)
+            ?? throw new InvalidOperationException("Email không hợp lệ");
+
+        await ConsumeOtpAsync(request.Email, request.Otp, "reset");
+
+        user.PasswordHash = BC.HashPassword(request.NewPassword);
+        if (!user.EmailConfirmed) user.EmailConfirmed = true;   // reset OK cũng coi như đã xác thực email
+        repo.Update(user);
+        await RevokeRefreshTokensAsync(user.Id);
+        await uow.CommitAsync();
+    }
+
+    // thu hồi mọi refresh token còn hiệu lực của user (KHÔNG commit — caller commit)
+    private async Task RevokeRefreshTokensAsync(int userId)
+    {
+        var repo = uow.Repository<RefreshToken>();
+        var active = await repo.Query().Where(t => t.UserId == userId && !t.Revoked).ToListAsync();
+        foreach (var t in active) { t.Revoked = true; repo.Update(t); }
+    }
+
+    private static ProfileDto ToProfile(User u) => new()
+    {
+        Id = u.Id,
+        Email = u.Email,
+        FullName = u.FullName,
+        Phone = u.Phone,
+        AvatarUrl = u.AvatarUrl,
+        DateOfBirth = u.DateOfBirth,
+        Gender = u.Gender,
+        Provider = u.Provider,
+        EmailConfirmed = u.EmailConfirmed,
+        Is2FAEnabled = u.Is2FAEnabled,
+        // Cho phép đổi mật khẩu với mọi tài khoản; BE kiểm mật khẩu cũ.
+        // (tài khoản chỉ-Google không biết pass cũ → tự nhiên sẽ bị chặn)
+        HasPassword = true
+    };
 
     // ===== 2FA (TOTP) =====
     public async Task<TwoFactorSetupResponse> SetupTwoFactorAsync(int userId)

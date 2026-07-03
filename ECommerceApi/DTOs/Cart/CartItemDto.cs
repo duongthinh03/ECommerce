@@ -5,6 +5,7 @@
         public int Id { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = null!;
+        public string? Thumbnail { get; set; }     // ảnh variant → fallback ảnh sản phẩm
         public int VariantId { get; set; }
         public string Sku { get; set; } = null!;
         public int Quantity { get; set; }

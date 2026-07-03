@@ -121,5 +121,65 @@ namespace ECommerceApi.Controllers
             await authService.ResendOtpAsync(request.Email);
             return OkResponse<object?>(null, "Đã gửi lại mã OTP");
         }
+
+        // ===== Tài khoản =====
+        [Authorize]
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile() =>
+            OkResponse(await authService.GetProfileAsync(CurrentUserId ?? 0));
+
+        [Authorize]
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request) =>
+            OkResponse(await authService.UpdateProfileAsync(CurrentUserId ?? 0, request), "Đã cập nhật thông tin");
+
+        [Authorize]
+        [HttpPost("avatar")]
+        public async Task<IActionResult> UploadAvatar(IFormFile file, [FromServices] IImageStorage storage)
+        {
+            if (file is null || file.Length == 0) return BadRequestResponse("Chưa chọn ảnh");
+            if (file.Length > 5 * 1024 * 1024) return BadRequestResponse("Ảnh tối đa 5MB");
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" }.Contains(ext))
+                return BadRequestResponse("Chỉ nhận ảnh jpg/png/webp/gif");
+
+            await using var stream = file.OpenReadStream();
+            var url = await storage.SaveAsync(stream, file.FileName, file.ContentType);
+            await authService.UpdateAvatarAsync(CurrentUserId ?? 0, url);
+            return OkResponse(new { url }, "Đã cập nhật ảnh đại diện");
+        }
+
+        [Authorize]
+        [HttpDelete("avatar")]
+        public async Task<IActionResult> DeleteAvatar()
+        {
+            await authService.UpdateAvatarAsync(CurrentUserId ?? 0, null);
+            return OkResponse<object?>(null, "Đã xóa ảnh đại diện");
+        }
+
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            await authService.ChangePasswordAsync(CurrentUserId ?? 0, request);
+            AuthCookies.Clear(Response);   // đổi mật khẩu → thu hồi token, buộc đăng nhập lại
+            return OkResponse<object?>(null, "Đã đổi mật khẩu. Vui lòng đăng nhập lại.");
+        }
+
+        // ===== Quên mật khẩu (ẩn danh) =====
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            await authService.ForgotPasswordAsync(request.Email);
+            // luôn trả OK để không lộ email nào tồn tại
+            return OkResponse<object?>(null, "Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi.");
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            await authService.ResetPasswordAsync(request);
+            return OkResponse<object?>(null, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập.");
+        }
     }
 }
