@@ -3,7 +3,7 @@ using ECommerceApi.DTOs.Catalog;
 using ECommerceApi.Models;
 using ECommerceApi.UnitOfWork;
 using Microsoft.EntityFrameworkCore;
-using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;  // ⚠️ alias (bẫy GreenDonut)
+using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;  // alias (bẫy GreenDonut)
 
 namespace ECommerceApi.Services;
 
@@ -11,8 +11,9 @@ public class ProductService(IUnitOfWork uow) : IProductService
 {
     public async Task<PagedResult<ProductDto>> SearchAsync(ProductSearchQuery query)
     {
-        IQueryable<Product> q = uow.Repository<Product>().Query()
-            .Include(p => p.Category)        // 🆕 nạp navigation để lấy CategoryName
+        IQueryable<Product> q = uow.Repository<Product>()
+            .Query()
+            .Include(p => p.Category)        // nạp navigation để lấy CategoryName
             .Include(p => p.Brand)
             .Include(p => p.Variants);       // để tính còn hàng (InStock)
 
@@ -39,22 +40,18 @@ public class ProductService(IUnitOfWork uow) : IProductService
             _ => q.OrderByDescending(p => p.Id),   // newest (mặc định)
         };
 
-        // ----- Phân trang -----
-        var total = await q.CountAsync();
-        var items = await q
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToListAsync();
+        // ----- Phân trang ----- (dùng helper sẵn có; query : PageRequest nên truyền thẳng)
+        var paged = await q.ToPagedResultAsync(query);
 
-        var dtos = items.Select(ToDto).ToList();
+        var dtos = paged.Items.Select(ToDto).ToList();
         await AttachRatingsAsync(dtos);
 
         return new PagedResult<ProductDto>
         {
             Items = dtos,
-            Page = query.Page,
-            PageSize = query.PageSize,
-            TotalCount = total
+            Page = paged.Page,
+            PageSize = paged.PageSize,
+            TotalCount = paged.TotalCount
         };
     }
 
