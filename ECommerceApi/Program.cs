@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using ECommerceApi.Common;
 using ECommerceApi.Data;
 using ECommerceApi.Repositories.Base;
@@ -43,6 +44,34 @@ builder.Services.AddFluentValidationAutoValidation();
 
 // Global error handling
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// ----- Rate limiting (chống brute-force / flood) -----
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Khi bị chặn: trả đúng envelope ApiResponse + header Retry-After (FE hiện message thân thiện)
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            ApiResponse<object>.Fail("Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút."), token);
+    };
+
+    // Toàn cục: chặn flood theo IP — ngưỡng cao, dùng bình thường không chạm tới
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromSeconds(10) }));
+
+    // "auth": siết chặt endpoint nhạy cảm (login/register/quên mật khẩu/OTP) — 8 lần / phút / IP
+    options.AddPolicy("auth", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 8, Window = TimeSpan.FromMinutes(1) }));
+});
 builder.Services.AddProblemDetails();
 
 // Auth: JWT bearer
@@ -116,14 +145,31 @@ var app = builder.Build();
 // ----- Pipeline -----
 app.UseExceptionHandler();   // phải đứng đầu để bắt mọi lỗi phía dưới
 
+// Security headers (rẻ, áp cho mọi response)
+app.Use(async (context, next) =>
+{
+    var h = context.Response.Headers;
+    h["X-Content-Type-Options"] = "nosniff";       // chặn MIME-sniffing
+    h["X-Frame-Options"] = "DENY";                 // chống clickjacking
+    h["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    await next();
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+else
+{
+    // Chỉ ép HTTPS ở production. Dev để HTTP thường (server-fetch của Next
+    // không bị redirect sang HTTPS self-signed → tránh lỗi "self-signed certificate").
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();   // phục vụ ảnh upload ở wwwroot/uploads
 app.UseCors(CorsPolicy);
+app.UseRateLimiter();   // sau CORS, trước auth
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

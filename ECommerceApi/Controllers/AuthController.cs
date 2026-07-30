@@ -4,6 +4,7 @@ using ECommerceApi.DTOs.Auth;
 using ECommerceApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace ECommerceApi.Controllers
@@ -15,6 +16,7 @@ namespace ECommerceApi.Controllers
         // dev chạy http → cookie Secure=false mới gửi được; production bật Secure
         private bool CookieSecure => !env.IsDevelopment();
 
+        [EnableRateLimiting("auth")]
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -22,6 +24,7 @@ namespace ECommerceApi.Controllers
             return OkResponse<object?>(null, "Đăng ký thành công. Vui lòng nhập mã OTP gửi tới email để kích hoạt tài khoản.");
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -32,6 +35,7 @@ namespace ECommerceApi.Controllers
             return OkResponse(response, "Đăng nhập thành công");
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("google")]
         public async Task<IActionResult> Google([FromBody] GoogleLoginRequest req)
         {
@@ -108,6 +112,7 @@ namespace ECommerceApi.Controllers
             return OkResponse(new TwoFactorStatusResponse { Enabled = enabled });
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("verify-otp")]
         public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
         {
@@ -115,6 +120,7 @@ namespace ECommerceApi.Controllers
             return OkResponse<object?>(null, "Xác thực email thành công");
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("resend-otp")]
         public async Task<IActionResult> ResendOtp([FromBody] ResendOtpRequest request)
         {
@@ -167,6 +173,7 @@ namespace ECommerceApi.Controllers
         }
 
         // ===== Quên mật khẩu (ẩn danh) =====
+        [EnableRateLimiting("auth")]
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
@@ -175,6 +182,7 @@ namespace ECommerceApi.Controllers
             return OkResponse<object?>(null, "Nếu email tồn tại, mã đặt lại mật khẩu đã được gửi.");
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
