@@ -37,6 +37,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         {
             "price_asc" => q.OrderBy(p => p.DisplayPrice).ThenByDescending(p => p.Id),
             "price_desc" => q.OrderByDescending(p => p.DisplayPrice).ThenByDescending(p => p.Id),
+            "best_selling" => q.OrderByDescending(p => p.SoldCount).ThenByDescending(p => p.Id),
             _ => q.OrderByDescending(p => p.Id),   // newest (mặc định)
         };
 
