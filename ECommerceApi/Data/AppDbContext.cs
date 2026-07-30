@@ -9,6 +9,7 @@ namespace ECommerceApi.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<User> Users => Set<User>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<Address> Addresses => Set<Address>();
 
         // --- Catalog (nhóm 2) ---
         public DbSet<Brand> Brands => Set<Brand>();
@@ -22,6 +23,34 @@ namespace ECommerceApi.Data
         public DbSet<AttributeValue> AttributeValues => Set<AttributeValue>();
         public DbSet<CategoryAttribute> CategoryAttributes => Set<CategoryAttribute>();
         public DbSet<VariantAttributeValue> VariantAttributeValues => Set<VariantAttributeValue>();
+
+        // --- Cart ---
+        public DbSet<Cart> Carts => Set<Cart>();
+        public DbSet<CartItem> CartItems => Set<CartItem>();
+
+        // --- Order ---
+        public DbSet<Order> Orders => Set<Order>();
+        public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+        public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+
+        // --- Coupon (Phase 2) ---
+        public DbSet<Coupon> Coupons => Set<Coupon>();
+        public DbSet<CouponUsage> CouponUsages => Set<CouponUsage>();
+
+        // --- Email OTP (Phase 2) ---
+        public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
+
+        // --- Thanh toán SePay (Phase 2) ---
+        public DbSet<SepayTransaction> SepayTransactions => Set<SepayTransaction>();
+
+        // --- 2FA recovery codes (Phase 2) ---
+        public DbSet<TwoFactorRecoveryCode> TwoFactorRecoveryCodes => Set<TwoFactorRecoveryCode>();
+
+        // --- Review + Wishlist (Phase 3) ---
+        public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+        public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
+
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

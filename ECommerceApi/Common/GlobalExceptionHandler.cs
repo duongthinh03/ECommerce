@@ -29,9 +29,13 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
                 status = StatusCodes.Status404NotFound;
                 message = exception.Message;
                 break;
+            case InvalidOperationException:   // vi phạm nghiệp vụ (vd email trùng)
+                status = StatusCodes.Status400BadRequest;
+                message = exception.Message;
+                break;
             case UnauthorizedAccessException:
                 status = StatusCodes.Status401Unauthorized;
-                message = "Không có quyền truy cập";
+                message = exception.Message;   // dùng message thật (vd "Email hoặc mật khẩu không đúng")
                 break;
             default:
                 status = StatusCodes.Status500InternalServerError;

@@ -376,6 +376,9 @@ bk-db/
 **/be.txt
 **/bo.txt
 
-# Tài liệu nội bộ (không đẩy lên repo)
-BRAINSTORM_BUOC_DAU.md
-PLAN_ECOMMERCE_MULTI_NGANH.md
+# Local secrets / env — KHÔNG đẩy lên repo
+.env
+**/appsettings.Development.json
+# Anh upload (khong commit noi dung, giu thu muc)
+ECommerceApi/wwwroot/uploads/*
+!ECommerceApi/wwwroot/uploads/.gitkeep

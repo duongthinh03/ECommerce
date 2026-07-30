@@ -7,6 +7,7 @@ public class ProductVariant : BaseEntity
     public Product Product { get; set; } = null!;
 
     public string Sku { get; set; } = null!;
+    public string? OptionName { get; set; }        // nhãn hiển thị của phiên bản (vd "3U", "Đỏ / Size 42") — nhãn tạm trước khi có Attribute
     public decimal Price { get; set; }
     public decimal? CompareAtPrice { get; set; }   // giá gạch ngang (khuyến mãi)
     public int Stock { get; set; }

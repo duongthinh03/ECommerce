@@ -1,6 +1,274 @@
-@ECommerceApi_HostAddress = http://localhost:5232
+@host = http://localhost:5232
+@adminEmail = a@test.com
+@adminPassword = Test@123
+###############################################
+# AUTH
+###############################################
 
-GET {{ECommerceApi_HostAddress}}/weatherforecast/
-Accept: application/json
+### Đăng ký (tạo user Customer)
+POST {{host}}/api/auth/register
+Content-Type: application/json
 
-###
+{
+  "email": "a@test.com",
+  "password": "Test@123",
+  "fullName": "Nguyen Van A",
+  "phone": "0900000000"
+}
+
+### Đăng nhập admin -> lấy token (đặt tên 'login' để tái dùng token bên dưới)
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Lấy accessToken từ response của request 'login' ở trên
+@token = {{login.response.body.$.data.accessToken}}
+
+### Refresh token
+POST {{host}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.$.data.refreshToken}}"
+}
+
+###############################################
+# CATEGORY (CRUD)
+###############################################
+
+### Danh sách category (công khai - không cần token)
+GET {{host}}/api/categories
+
+### Tạo category (cần Admin)
+POST {{host}}/api/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Điện thoại",
+  "slug": "dien-thoai",
+  "description": "Ngành hàng điện thoại",
+  "sortOrder": 1,
+  "isActive": true
+}
+
+### Chi tiết category id=1 (công khai)
+GET {{host}}/api/categories/1
+
+### Cập nhật category id=1 (cần Admin)
+PUT {{host}}/api/categories/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Điện thoại & Phụ kiện",
+  "slug": "dien-thoai",
+  "description": "Đã cập nhật mô tả",
+  "sortOrder": 2,
+  "isActive": true
+}
+
+### Xóa category id=1 (cần Admin - soft delete)
+DELETE {{host}}/api/categories/1
+Authorization: Bearer {{token}}
+
+###############################################
+# TEST PHÂN QUYỀN
+###############################################
+
+### Tạo category KHÔNG token -> mong đợi 401 Unauthorized
+POST {{host}}/api/categories
+Content-Type: application/json
+
+{
+  "name": "Khong token",
+  "slug": "khong-token",
+  "sortOrder": 0,
+  "isActive": true
+}
+
+###############################################
+# PRODUCT (CRUD)
+###############################################
+
+### Danh sách product (công khai)
+GET {{host}}/api/products
+
+### Tạo product (cần Admin) - đổi categoryId cho khớp category đã có
+POST {{host}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "iPhone 15",
+  "slug": "iphone-15",
+  "description": "Điện thoại Apple",
+  "categoryId": 1,
+  "displayPrice": 20000000,
+  "isActive": true
+}
+
+### Chi tiết product id=1 (công khai)
+GET {{host}}/api/products/1
+
+### Cập nhật product id=1 (cần Admin)
+PUT {{host}}/api/products/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "iPhone 15 Pro",
+  "slug": "iphone-15",
+  "description": "Bản Pro",
+  "categoryId": 1,
+  "displayPrice": 28000000,
+  "isActive": true
+}
+
+### Xóa product id=1 (cần Admin - soft delete)
+DELETE {{host}}/api/products/1
+Authorization: Bearer {{token}}
+
+### Test FK sai: categoryId không tồn tại -> mong đợi 400
+POST {{host}}/api/products
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "San pham loi",
+  "slug": "sp-loi",
+  "categoryId": 999,
+  "displayPrice": 1000,
+  "isActive": true
+}
+
+###############################################
+# VARIANT (CRUD) - lồng dưới product
+###############################################
+
+### Danh sách variant của product 1 (công khai)
+GET {{host}}/api/products/1/variants
+
+### Tạo variant cho product 1 (cần Admin)
+POST {{host}}/api/products/1/variants
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "IP15-128-BLACK",
+  "price": 20000000,
+  "compareAtPrice": 22000000,
+  "stock": 50,
+  "isActive": true
+}
+
+### Chi tiết variant id=1 của product 1
+GET {{host}}/api/products/1/variants/1
+
+### Cập nhật variant id=1 (cần Admin)
+PUT {{host}}/api/products/1/variants/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "IP15-128-BLACK",
+  "price": 19500000,
+  "stock": 45,
+  "isActive": true
+}
+
+### Xóa variant id=1 (cần Admin)
+DELETE {{host}}/api/products/1/variants/1
+Authorization: Bearer {{token}}
+
+### Test product cha không tồn tại -> mong đợi 404
+POST {{host}}/api/products/1/variants
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "sku": "SKU-LOI",
+  "price": 1000,
+  "stock": 1,
+  "isActive": true
+}
+
+
+### Guest: thêm vào giỏ (dùng header X-Session-Id tùy ý)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+X-Session-Id: guest-abc-123
+
+{ "variantId": 1, "quantity": 2 }
+
+### Xem giỏ guest
+GET {{host}}/api/cart
+X-Session-Id: guest-abc-123
+
+### User: thêm vào giỏ (dùng token, KHÔNG cần header)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "variantId": 1, "quantity": 1 }
+
+### 1) Guest bỏ hàng vào giỏ (chưa login)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+X-Session-Id: guest-abc-123
+
+{ "variantId": 1, "quantity": 2 }
+
+### 2) Login (lấy token user) — bấm request login ở phần AUTH
+
+### 3) Merge giỏ guest vào giỏ user
+POST {{host}}/api/cart/merge
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "sessionId": "guest-abc-123" }
+
+###############################################
+# ORDER (Checkout COD)
+###############################################
+### 1) Login lấy token (bấm request 'login' ở phần AUTH trước)
+
+### 2) Thêm hàng vào giỏ (user)
+POST {{host}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "variantId": 1, "quantity": 2 }
+
+### 3) Đặt hàng (checkout) -> tạo đơn + trừ kho + xóa giỏ
+POST {{host}}/api/orders
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "shipRecipient": "Nguyen Van A",
+  "shipPhone": "0900000000",
+  "shipProvince": "Hà Nội",
+  "shipDistrict": "Cầu Giấy",
+  "shipWard": "Dịch Vọng",
+  "shipAddressLine": "Số 1 Phố ABC",
+  "note": "Giao giờ hành chính",
+  "paymentMethod": "COD"
+}
+
+### 4) Xem đơn của tôi
+GET {{host}}/api/orders
+Authorization: Bearer {{token}}
+
+### 5) Chi tiết đơn id=1
+GET {{host}}/api/orders/1
+Authorization: Bearer {{token}}
+
+### 6) Giỏ phải RỖNG sau khi đặt
+GET {{host}}/api/cart
+Authorization: Bearer {{token}}

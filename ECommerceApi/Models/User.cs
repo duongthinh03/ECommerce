@@ -7,6 +7,8 @@ public class User : BaseEntity
     public string FullName { get; set; } = null!;
     public string? Phone { get; set; }
     public string? AvatarUrl { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
+    public string? Gender { get; set; }            // "Male" | "Female" | "Other"
 
     public int RoleId { get; set; }
     public Role Role { get; set; } = null!;
@@ -26,4 +28,5 @@ public class User : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
+    public ICollection<Address> Addresses { get; set; } = [];
 }

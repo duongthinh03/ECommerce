@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECommerceApi — Sơ đồ kiến trúc & luồng nghiệp vụ</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root{
+      --bg:#0d1117; --bg2:#12182260; --card:#161b22; --border:#2a3140; --accent:#58a6ff;
+      --green:#3fb950; --orange:#d29922; --grey:#6e7681; --blue:#388bfd; --text:#e6edf3; --muted:#8b949e;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family:'Segoe UI',system-ui,sans-serif; color:var(--text); line-height:1.55;
+      background:
+        radial-gradient(1100px 560px at 15% -8%, #1c2740 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #14243a 0%, transparent 50%),
+        #0a0e14;
+      min-height:100vh;
+    }
+    .wrap{ max-width:1120px; margin:0 auto; padding:34px 24px 90px; }
+    header.hero{
+      background:linear-gradient(135deg,#1f6feb22,#3fb95011 60%,#12182200);
+      border:1px solid var(--border); border-radius:18px; padding:30px 34px;
+      box-shadow:0 10px 40px #00000050;
+    }
+    header.hero h1{ margin:0; font-size:30px; letter-spacing:.3px; }
+    header.hero h1 .accent{ background:linear-gradient(90deg,#58a6ff,#3fb950); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    header.hero p{ margin:8px 0 0; color:var(--muted); font-size:15px; }
+    .legend{ display:flex; gap:10px; flex-wrap:wrap; margin:22px 0 6px; }
+    .chip{ background:#161b22; border:1px solid var(--border); border-radius:999px; padding:7px 15px; font-size:13px; display:inline-flex; align-items:center; gap:8px; }
+    .dot{ width:11px; height:11px; border-radius:50%; box-shadow:0 0 8px currentColor; }
+    section{ margin-top:38px; }
+    section > h2{ font-size:20px; margin:0 0 4px; display:flex; align-items:center; gap:10px; }
+    section > h2 .num{ background:linear-gradient(135deg,#1f6feb,#388bfd); color:#fff; font-size:13px; font-weight:700; width:26px; height:26px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; }
+    section > .sub{ color:var(--muted); font-size:13.5px; margin:0 0 16px; padding-left:36px; }
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:0 12px 32px #00000055; overflow:auto; }
+    .mermaid{ display:flex; justify-content:center; }
+    .hero-card{ border-color:#2f4263; box-shadow:0 16px 50px #1f6feb22, 0 12px 32px #00000055; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>🛒 <span class="accent">ECommerceApi</span> — Kiến trúc &amp; Luồng nghiệp vụ</h1>
+      <p>Web thương mại điện tử đa ngành hàng · ASP.NET Core (.NET 10) + EF Core + SQL Server</p>
+      <div class="legend">
+        <span class="chip"><i class="dot" style="color:#3fb950;background:#3fb950"></i>Đã xong</span>
+        <span class="chip"><i class="dot" style="color:#d29922;background:#d29922"></i>Đang làm</span>
+        <span class="chip"><i class="dot" style="color:#6e7681;background:#6e7681"></i>Chưa làm</span>
+        <span class="chip"><i class="dot" style="color:#388bfd;background:#388bfd"></i>Dịch vụ ngoài</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>★ Kiến trúc hệ thống</h2>
+      <p class="sub">Vùng vàng = Backend · xanh lá = Lưu trữ · xanh dương = dịch vụ ngoài · ①②③ = thứ tự luồng.</p>
+      <div class="card hero-card">
+      <pre class="mermaid">
+flowchart LR
+    CUST(["👤 Khách<br/>Guest / Customer"])
+    ADMIN(["🛠️ Admin / Staff"])
+
+    subgraph CLIENT["🖥️ Client • Next.js &nbsp;(Phase sau)"]
+        direction TB
+        SF["Storefront"]
+        ADP["Admin Panel"]
+    end
+
+    subgraph API["⚙️ Backend API • .NET 10"]
+        direction TB
+        AUTH["🔐 Auth · JWT"]
+        CAT["📦 Catalog"]
+        CART["🛒 Cart"]
+        ORD["🧾 Order"]
+        PAY["💳 Payment"]
+    end
+
+    subgraph STORE["🗄️ Lưu trữ"]
+        direction TB
+        SQL[("🗃️ SQL Server<br/>Docker :14330")]
+        REDIS[("⚡ Redis<br/>Phase sau")]
+    end
+
+    subgraph OUT["🌐 Dịch vụ ngoài"]
+        direction TB
+        PG["💳 VNPay / Momo / ZaloPay"]
+        SMTP["📧 Gmail SMTP"]
+    end
+
+    CUST -->|"① REST"| SF
+    ADMIN -->|"REST"| ADP
+    SF -->|"② API"| API
+    ADP --> API
+    AUTH --> SQL
+    CAT --> SQL
+    CART --> SQL
+    ORD --> SQL
+    CART -.->|"cache (sau)"| REDIS
+    PAY -->|"③ redirect"| PG
+    PG -.->|"④ IPN verify"| PAY
+    ORD -.->|"⑤ email"| SMTP
+
+    classDef done fill:#1a7f37,stroke:#3fb950,color:#fff,rx:8,ry:8;
+    classDef wip fill:#9e6a03,stroke:#e3b341,color:#fff,rx:8,ry:8;
+    classDef todo fill:#272e3b,stroke:#6e7681,color:#c9d1d9,rx:8,ry:8;
+    classDef ext fill:#0d419d,stroke:#388bfd,color:#fff,rx:8,ry:8;
+    classDef actor fill:#30363d,stroke:#8b949e,color:#fff;
+    class CUST,ADMIN actor;
+    class AUTH,CAT,SQL done;
+    class CART wip;
+    class ORD,PAY,SF,ADP,REDIS todo;
+    class PG,SMTP ext;
+
+    style CLIENT fill:#10151f,stroke:#3b4252,color:#adbac7;
+    style API fill:#241b04,stroke:#9e6a03,color:#e3b341;
+    style STORE fill:#0a1f12,stroke:#1a7f37,color:#56d364;
+    style OUT fill:#08203f,stroke:#0d419d,color:#79c0ff;
+      </pre>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="num">1</span> Luồng mua hàng end-to-end</h2>
+      <div class="card">
+      <pre class="mermaid">
+flowchart TD
+    A["Khách duyệt catalog<br/>GET /categories, /products"] --> B["Xem chi tiết SP + chọn variant<br/>GET /products/id + /variants"]
+    B --> C["Thêm vào giỏ<br/>POST /cart/items"]
+    C --> D["Xem / sửa giỏ<br/>GET /cart"]
+    D --> E{"Đang là guest?"}
+    E -- "đăng nhập" --> F["MERGE giỏ guest → user"]
+    E -- "đã login" --> G
+    F --> G["CHECKOUT<br/>địa chỉ + phương thức + tính tiền"]
+    G --> H["TRỪ KHO + Tạo Order<br/>OrderItems snapshot + xóa giỏ"]
+    H --> I{"Phương thức?"}
+    I -- "COD" --> J["Order = Confirmed<br/>Payment = Unpaid"]
+    I -- "Online" --> K["Redirect cổng → IPN verify<br/>→ Payment = Paid"]
+    J --> L["Theo dõi đơn<br/>GET /orders/id"]
+    K --> L
+
+    classDef done fill:#1a7f37,stroke:#3fb950,color:#fff,rx:8,ry:8;
+    classDef wip fill:#9e6a03,stroke:#e3b341,color:#fff,rx:8,ry:8;
+    classDef todo fill:#272e3b,stroke:#6e7681,color:#c9d1d9,rx:8,ry:8;
+    class A,B done;
+    class C,D,E,F wip;
+    class G,H,I,J,K,L todo;
+  </pre>
+  </div>
+    </section>
+
+    <section>
+      <h2><span class="num">2</span> Định danh giỏ + Merge (guest ↔ user)</h2>
+      <div class="card">
+      <pre class="mermaid">
+flowchart TD
+    R["Request tới giỏ"] --> Q{"Có JWT token?"}
+    Q -- "Có" --> U["userId = sub claim<br/>tìm Cart WHERE UserId"]
+    Q -- "Không" --> S{"Có header<br/>X-Session-Id?"}
+    S -- "Có" --> SS["tìm Cart WHERE SessionId"]
+    S -- "Không" --> ER["❌ 400 thiếu định danh giỏ"]
+    U --> FC["Find-or-Create giỏ"]
+    SS --> FC
+    FC --> ADD["Add item: variant đã có trong giỏ?<br/>Có → Quantity += · Chưa → thêm dòng mới"]
+
+    classDef wip fill:#9e6a03,stroke:#e3b341,color:#fff,rx:8,ry:8;
+    classDef todo fill:#272e3b,stroke:#6e7681,color:#c9d1d9,rx:8,ry:8;
+    class R,Q,U,S,SS,FC,ADD wip;
+    class ER todo;
+  </pre>
+  </div>
+    </section>
+
+    <section>
+      <h2><span class="num">3</span> Máy trạng thái — Đơn hàng &amp; Thanh toán</h2>
+      <p class="sub">2 trục độc lập: Order.Status (giao hàng) vs Payment.Status (tiền). Vd COD: Confirmed nhưng Unpaid tới khi giao.</p>
+      <div class="card">
+      <pre class="mermaid">
+stateDiagram-v2
+    direction LR
+    state "ĐƠN HÀNG" as O {
+        [*] --> Pending
+        Pending --> Confirmed
+        Confirmed --> Packing
+        Packing --> Shipping
+        Shipping --> Delivered
+        Delivered --> Completed
+        Confirmed --> Cancelled
+        Delivered --> Refunded
+    }
+    state "THANH TOÁN" as P {
+        [*] --> Unpaid
+        Unpaid --> PendingPay
+        PendingPay --> Paid
+        PendingPay --> Failed
+        Paid --> RefundedPay
+    }
+  </pre>
+  </div>
+    </section>
+
+    <section>
+      <h2><span class="num">4</span> Luồng Admin / vận hành</h2>
+      <div class="card">
+      <pre class="mermaid">
+flowchart LR
+    AD(["🛠️ Admin / Staff"]) --> C1["CRUD Category / Product / Variant"]
+    AD --> C2["Gán Attribute (size/màu)"]
+    AD --> C3["Quản lý đơn: đổi trạng thái<br/>+ OrderStatusHistory"]
+    AD --> C4["Tồn kho: chỉnh Stock"]
+    AD --> C5["Coupon giảm giá"]
+    AD --> C6["Phân quyền Admin/Manager/Staff"]
+
+    classDef done fill:#1a7f37,stroke:#3fb950,color:#fff,rx:8,ry:8;
+    classDef todo fill:#272e3b,stroke:#6e7681,color:#c9d1d9,rx:8,ry:8;
+    classDef actor fill:#30363d,stroke:#8b949e,color:#fff;
+    class AD actor;
+    class C1,C6 done;
+    class C2,C3,C4,C5 todo;
+  </pre>
+  </div>
+    </section>
+
+    <section>
+      <h2><span class="num">5</span> Tiến độ theo Phase</h2>
+      <div class="card">
+      <pre class="mermaid">
+flowchart LR
+    P0["Phase 0 · Nền BE<br/>~90%"] --> P1["Phase 1 · MVP đặt đơn<br/>~35%"]
+    P1 --> P2["Phase 2+ · Payment / OTP<br/>Coupon / Review / Chat"]
+
+    subgraph PH1 ["Phase 1 — chi tiết"]
+        direction TB
+        T1["Auth ✅"] --> T2["Catalog Cat/Prod/Variant ✅"]
+        T2 --> T3["Cart 🔜 (chặng 1/4)"]
+        T3 --> T4["Checkout COD ⬜"]
+        T4 --> T5["Order ⬜"]
+    end
+    P1 -.-> PH1
+
+    classDef done fill:#1a7f37,stroke:#3fb950,color:#fff,rx:8,ry:8;
+    classDef wip fill:#9e6a03,stroke:#e3b341,color:#fff,rx:8,ry:8;
+    classDef todo fill:#272e3b,stroke:#6e7681,color:#c9d1d9,rx:8,ry:8;
+    class P0,T1,T2 done;
+    class P1,T3 wip;
+    class P2,T4,T5 todo;
+    style PH1 fill:#10151f,stroke:#3b4252,color:#adbac7;
+  </pre>
+  </div>
+    </section>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      themeVariables: {
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+        fontSize: "15px",
+        primaryColor: "#1b2230",
+        primaryTextColor: "#e6edf3",
+        primaryBorderColor: "#3b4252",
+        lineColor: "#7d8794",
+        secondaryColor: "#161b22",
+        tertiaryColor: "#12182a"
+      },
+      flowchart: { curve: "basis", htmlLabels: true, padding: 14, nodeSpacing: 55, rankSpacing: 62 },
+      securityLevel: "loose"
+    });
+  </script>
+</body>
+</html>

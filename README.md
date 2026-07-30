@@ -2,8 +2,6 @@
 
 Backend API cho web thương mại điện tử đa ngành hàng. ASP.NET Core (.NET 10) + EF Core + SQL Server.
 
-> Định hướng & schema: xem `PLAN_ECOMMERCE_MULTI_NGANH.md`. Nhật ký dựng nền: `BRAINSTORM_BUOC_DAU.md`.
-
 ## Stack
 - **.NET 10** (ASP.NET Core Web API)
 - **EF Core 10** + SQL Server (Docker)
@@ -17,13 +15,17 @@ Backend API cho web thương mại điện tử đa ngành hàng. ASP.NET Core (
 
 ## Cài đặt & chạy
 
-### 1. Chạy SQL Server bằng Docker
-```powershell
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Ecom@2026Dev" -p 14330:1433 --name ecom-sql -v ecom-sqldata:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2022-latest
+### 1. Chạy SQL Server bằng Docker Compose
+Tạo file `.env` ở thư mục gốc (copy từ `.env.example`), đặt mật khẩu SA:
 ```
-> Map cổng host **14330** → 1433 trong container để tránh đụng SQL Server native (nếu máy có sẵn instance chiếm 1433). Máy không có SQL native thì dùng `-p 1433:1433` cũng được — nhớ chỉnh cổng trong connection string cho khớp.
-> Mật khẩu SA phải đủ mạnh (≥8 ký tự, đủ hoa/thường/số/đặc biệt) nếu không container sẽ tắt.
-> Container đã có sẵn lần sau chỉ cần: `docker start ecom-sql`.
+SA_PASSWORD=<mật khẩu mạnh: ≥8 ký tự, đủ hoa/thường/số/đặc biệt>
+```
+Rồi bật container (chạy ở thư mục gốc — chỗ có `docker-compose.yml`):
+```powershell
+docker compose up -d
+```
+> Container `ecom-sql` map cổng host **14330** → 1433 (tránh đụng SQL Server native nếu máy đã có instance chiếm 1433). `restart: unless-stopped` nên tự bật lại khi mở máy.
+> Lệnh hằng ngày: `docker compose up -d` (bật) · `docker compose down` (tắt, giữ data) · `docker compose logs -f sqlserver` (xem log).
 
 ### 2. Cấu hình connection string (user-secrets)
 Repo **không chứa** connection string (tránh commit secret). Tự set vào user-secrets — **chỉ cần thay `<YOUR_PASSWORD>`** cho khớp mật khẩu ở bước 1:
